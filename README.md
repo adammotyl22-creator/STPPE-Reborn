@@ -24,6 +24,12 @@ STPPE Reborn brings the firmware and browser control application for a six-axis 
 | Move individual joints and enter Cartesian targets. | Inspect the arm, target pose, and workspace in 3D. | Arrange motion steps in the trajectory timeline. |
 | Connect to the controller through Web Serial. | Follow telemetry and command output. | Explore the interface using the built-in simulator. |
 
+## WebControl preview
+
+[![WebControl dashboard showing Cartesian motion controls, the 3D robot arm, telemetry, and the command console](docs/assets/webcontrol-dashboard.png)](docs/assets/webcontrol-dashboard.png)
+
+*The WebControl interface with the robot disconnected. Click the image to view it at full resolution.*
+
 ## Quick start
 
 **1. Download the project** using GitHub's **Code → Download ZIP**, then extract it. Or clone it:
