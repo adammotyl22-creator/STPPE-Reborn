@@ -1,8 +1,0 @@
-Firmware/
-├── Teensy_4.1/
-│   ├── IK_Control/IK_Control.ino
-│   └── Pinout_Teensy.txt
-├── OrbitControls.js
-├── sweep.json
-├── sweep.txt
-└── three.min.js
