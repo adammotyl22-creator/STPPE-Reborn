@@ -49,7 +49,7 @@ Konstrukcja hybrydowa wykorzystująca elementy drukowane 3D oraz części metalo
 ## 4. System Elektroniczny
 
 ### 4.1 Mikrokontrolery
-- **Master (Kontroler ręczny):** Arduino Pro Micro (kompaktowy, obsługa HID/Serial)
+- **Master (Kontroler ręczny):** ESP32-C3 (kompaktowy, obsługa HID/Serial)
 - **Slave (Robot):** Teensy 4.1 (wysoka wydajność obliczeniowa do sterowania silnikami krokowymi)
 
 ### 4.2 Sterowanie Napędami
@@ -71,7 +71,7 @@ Konstrukcja hybrydowa wykorzystująca elementy drukowane 3D oraz części metalo
 - **Oświetlenie:** Pierścień LED
 
 ## 6. Interfejs Kontrolny
-Panel sterujący typu **Master** oparty na Arduino Pro Micro.
+Panel sterujący typu **Master** oparty na ESP32-C3.
 - Odczyt pozycji operatora (enkodery / potencjometry)
 - Komunikacja z jednostką centralną (Teensy)
 - Obsługa przycisków funkcyjnych
@@ -87,7 +87,7 @@ Panel sterujący typu **Master** oparty na Arduino Pro Micro.
 1. Montaż silników NEMA 17 z przekładniami do korpusu.
 2. Kalibracja sterowników silników krokowych (ustawienie prądu Vref).
 3. Podłączenie elektroniki sterującej (Teensy 4.1).
-4. Zaprogramowanie Arduino Pro Micro jako interfejsu wejściowego.
+4. Zaprogramowanie ESP32-C3 jako interfejsu wejściowego.
 
 ---
 **Wersja dokumentacji:** 1.5 (Zaktualizowana)
@@ -99,3 +99,4 @@ Panel sterujący typu **Master** oparty na Arduino Pro Micro.
 **Data aktualizacji:** 2025-12-24  
 **Tytuł:** System Teleoperacyjny – Dokumentacja Techniczna  
 **Autor:** Adam Motyl 
+

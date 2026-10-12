@@ -104,7 +104,7 @@ void refreshEncoderCache();
 // ================= USB HOST SETUP =================
 USBHost myusb;
 USBHub hub1(myusb);
-USBSerial userial(myusb); // Serial from Pro Micro
+USBSerial userial(myusb); // Serial from handheld controller
 
 // ================= PIN DEFINITIONS =================
 // Axis 1 (Main Base)
@@ -2414,7 +2414,7 @@ void setup() {
   Serial.println();
 
   // USB Host
-  Serial.print("      USB Host (Pro Micro): ");
+  Serial.print("      USB Host (handheld): ");
   if (userial) {
     Serial.println("CONNECTED");
   } else {
@@ -4391,3 +4391,4 @@ void checkCalTestResults() {
   }
   Serial.println("---------------------------------");
 }
+

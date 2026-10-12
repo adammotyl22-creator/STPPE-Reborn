@@ -292,7 +292,7 @@
 
         <h3>4.1 Mikrokontrolery</h3>
         <ul>
-            <li><strong>Master (Kontroler):</strong> Arduino Pro Micro - Kompaktowy kontroler interfejsu operatora.</li>
+            <li><strong>Master (Kontroler):</strong> ESP32-C3 - Kompaktowy kontroler interfejsu operatora.</li>
             <li><strong>Slave (Robot):</strong> Teensy 4.1 - Wysokowydajny procesor do sterowania silnikami krokowymi.</li>
         </ul>
 
@@ -346,7 +346,7 @@
         <h2 id="interface">6. Interfejs Kontrolny</h2>
 
         <h3>6.1 Konstrukcja</h3>
-        <p>Panel sterujący typu <strong>Master</strong> oparty na Arduino Pro Micro.</p>
+        <p>Panel sterujący typu <strong>Master</strong> oparty na ESP32-C3.</p>
         <ul>
             <li>Odczyt pozycji operatora przy użyciu enkoderów</li>
             <li>Komunikacja szeregowa z jednostką Teensy</li>
@@ -361,7 +361,7 @@
 ┌─────────────┐       UART        ┌─────────────┐
 │  MASTER     │ ◄───────────────► │   SLAVE     │
 │ Arduino     │                   │  Teensy     │
-│ Pro Micro   │                   │    4.1      │
+│             │                   │    4.1      │
 └─────────────┘                   └──────┬──────┘
        ▲                                 │
        │                                 ▼
@@ -418,3 +418,4 @@
     </div>
 </body>
 </html>
+

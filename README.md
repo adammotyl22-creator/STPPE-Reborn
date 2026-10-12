@@ -4,7 +4,7 @@ STPPE Reborn contains the robot firmware, browser control application, mechanica
 
 ## Project Areas
 
-- `Firmware/` - Teensy, ESP32-C3, and Pro Micro firmware and pinout references.
+- `Firmware/` - Teensy 4.1 firmware and pinout references.
 - `WebControl/` - Zero-build browser control application and its 3D visualization assets.
 - `Models/` - Standalone 3MF models.
 - `Pliki graficzne/` - Technical documents, poster/site files, and product images.
@@ -34,4 +34,7 @@ python WebControl/launch.py --lan
 ```
 
 Open the printed **Phone URL** on the phone. If Windows Firewall asks, allow Python on private networks only. Without `--lan`, the server remains accessible only on this PC.
+
+
+
 
