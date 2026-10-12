@@ -6,8 +6,6 @@ STPPE Reborn contains the robot firmware, browser control application, mechanica
 
 - `Firmware/` - Teensy 4.1 firmware.
 - `WebControl/` - Zero-build browser control application and its 3D visualization assets.
-- `Models/` - Standalone 3MF models.
-- `Pliki graficzne/` - Technical documents, poster/site files, and product images.
 
 ## WebControl
 
