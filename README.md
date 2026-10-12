@@ -8,8 +8,6 @@ STPPE Reborn contains the robot firmware, browser control application, mechanica
 - `WebControl/` - Zero-build browser control application and its 3D visualization assets.
 - `Models/` - Standalone 3MF models.
 - `Pliki graficzne/` - Technical documents, poster/site files, and product images.
-- `scratch/` - Development scripts and temporary build workspaces; archived logs are in `scratch/logs/`.
-- `ORIGINAL_REQUEST.md` - Project requirements and request history.
 
 ## WebControl
 
@@ -36,3 +34,4 @@ python WebControl/launch.py --lan
 ```
 
 Open the printed **Phone URL** on the phone. If Windows Firewall asks, allow Python on private networks only. Without `--lan`, the server remains accessible only on this PC.
+
