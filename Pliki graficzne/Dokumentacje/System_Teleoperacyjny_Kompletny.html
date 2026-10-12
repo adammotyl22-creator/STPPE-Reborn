@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Teleoperacyjny - Kompletna Dokumentacja Techniczna</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            text-align: center;
+            font-size: 2.2em;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            font-size: 1.5em;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 25px;
+            font-size: 1.3em;
+        }
+        h4 {
+            color: #95a5a6;
+            margin-top: 20px;
+            font-size: 1.1em;
+        }
+        .toc {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc li {
+            margin: 5px 0;
+        }
+        .toc a {
+            text-decoration: none;
+            color: #2c3e50;
+        }
+        .toc a:hover {
+            color: #3498db;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        code {
+            background: #ecf0f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .warning {
+            background: #f8d7da;
+            padding: 10px;
+            border-left: 4px solid #dc3545;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .info {
+            background: #d1ecf1;
+            padding: 10px;
+            border-left: 4px solid #17a2b8;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .section-header {
+            background: #3498db;
+            color: white;
+            padding: 10px 15px;
+            margin: 20px 0 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .component-list {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .technical-note {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-style: italic;
+        }
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+            .page-break { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>System Teleoperacyjny do Precyzyjnych Prac Elektronicznych</h1>
+        <p style="text-align: center; color: #7f8c8d; font-size: 1.1em;">
+            <strong>Kompletna Dokumentacja Techniczna</strong><br>
+            Wersja 1.5 | Data: 2025-12-24 | Autor: Adam Motyl (Zaktualizowano)
+        </p>
+
+        <div class="toc">
+            <h2>Spis Treści</h2>
+            <ul>
+                <li><a href="#overview">1. Przegląd Systemu</a></li>
+                <li><a href="#technical-spec">2. Specyfikacja Techniczna</a></li>
+                <li><a href="#components">3. Komponenty Mechaniczne</a></li>
+                <li><a href="#electronics">4. System Elektroniczny</a></li>
+                <li><a href="#vision">5. System Wizyjny</a></li>
+                <li><a href="#interface">6. Interfejs Kontrolny</a></li>
+                <li><a href="#software">7. Oprogramowanie</a></li>
+                <li><a href="#schematics">8. Schematy Podłączeń</a></li>
+                <li><a href="#assembly">9. Instrukcja Montażu</a></li>
+                <li><a href="#maintenance">10. Konserwacja</a></li>
+                <li><a href="#troubleshooting">11. Rozwiązywanie Problemów</a></li>
+                <li><a href="#safety">12. Bezpieczeństwo</a></li>
+            </ul>
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2 id="overview">1. Przegląd Systemu</h2>
+        
+        <h3>1.1 Opis Projektu</h3>
+        <p>System teleoperacyjny przeznaczony do precyzyjnych prac serwisowych w elektronice. Projekt wykorzystuje hybrydowy układ napędowy oparty na silnikach krokowych z przekładniami planetarnymi dla osi głównych oraz serwomechanizmy high-torque dla chwytaka.</p>
+
+        <h3>1.2 Główne Cele</h3>
+        <ul>
+            <li>Zwiększenie precyzji pozycjonowania dzięki przekładniom 20:1</li>
+            <li>Eliminacja wpływu drgań rąk operatora na jakość pracy</li>
+            <li>Płynność ruchu dzięki sterownikom mikrokrokowym</li>
+            <li>Możliwość pracy z różnymi narzędziami (chwytak, lutownica, kamera)</li>
+        </ul>
+
+        <div class="page-break"></div>
+
+        <h2 id="technical-spec">2. Specyfikacja Techniczna</h2>
+
+        <h3>2.1 Parametry Manipulatora</h3>
+        <table>
+            <tr>
+                <th>Parametr</th>
+                <th>Wartość</th>
+                <th>Opis</th>
+            </tr>
+             <tr>
+                 <td>Liczba osi</td>
+                 <td>6 (6 DOF)</td>
+                 <td>Pełna swoboda ruchu</td>
+             </tr>
+            <tr>
+                <td>Dokładność pozycjonowania</td>
+                <td>&lt;0,1 mm (teoretyczna)</td>
+                <td>Zależna od mikrokroku</td>
+            </tr>
+            <tr>
+                <td>Powtarzalność</td>
+                <td>±0,1 mm</td>
+                <td>Dzięki przekładniom bezluzowym</td>
+            </tr>
+            <tr>
+                <td>Moment obrotowy</td>
+                <td>Wysoki (Przekładnia 20:1)</td>
+                <td>Dla osi głównych</td>
+            </tr>
+        </table>
+
+         <h3>2.2 Zakresy Ruchu i Napędy</h3>
+        <table>
+            <tr>
+                <th>Oś</th>
+                <th>Napęd</th>
+                <th>Przekładnia</th>
+            </tr>
+            <tr>
+                <td>Oś 1 (Baza J1 - Yaw)</td>
+                <td>NEMA 17 (TMC2209)</td>
+                <td>8.33:1</td>
+            </tr>
+            <tr>
+                <td>Oś 2 (Ramię J2 - Pitch)</td>
+                <td>NEMA 17 (TMC2209)</td>
+                <td>Planetarna 20:1</td>
+            </tr>
+            <tr>
+                <td>Oś 3 (Przedramię J3 - Pitch)</td>
+                <td>NEMA 17 (TMC2209)</td>
+                <td>Planetarna 20:1</td>
+            </tr>
+            <tr>
+                <td>Osie Nadgarstka (J4, J5, J6)</td>
+                <td>Silniki krokowe (TMC2209)</td>
+                <td>Przełożenie bezpośrednie / redukcja</td>
+            </tr>
+            <tr>
+                <td>Chwytak narzędziowy</td>
+                <td>Serwo PWM (Pin 21)</td>
+                <td>Bezpośrednie</td>
+            </tr>
+        </table>
+
+        <div class="page-break"></div>
+
+        <h2 id="components">3. Komponenty Mechaniczne</h2>
+
+        <h3>3.1 Struktura Główna</h3>
+        <p>Konstrukcja hybrydowa łącząca elementy drukowane 3D (PLA/PETG) z metalowymi elementami napędowymi.</p>
+        
+        <h3>3.2 Materiały</h3>
+        <table>
+            <tr>
+                <th>Element</th>
+                <th>Materiał</th>
+                <th>Metoda Produkcji</th>
+                <th>Uwagi</th>
+            </tr>
+            <tr>
+                <td>Korpus</td>
+                <td>PLA / PETG</td>
+                <td>Druk 3D</td>
+                <td>Sztywność i wytrzymałość</td>
+            </tr>
+            <tr>
+                <td>Napędy</td>
+                <td>Metal/Stop</td>
+                <td>Gotowe komponenty</td>
+                <td>Silniki i przekładnie</td>
+            </tr>
+        </table>
+
+        <div class="page-break"></div>
+
+        <h2 id="electronics">4. System Elektroniczny</h2>
+
+        <h3>4.1 Mikrokontrolery</h3>
+        <ul>
+            <li><strong>Master (Kontroler):</strong> Arduino Pro Micro - Kompaktowy kontroler interfejsu operatora.</li>
+            <li><strong>Slave (Robot):</strong> Teensy 4.1 - Wysokowydajny procesor do sterowania silnikami krokowymi.</li>
+        </ul>
+
+        <h3>4.2 Sterowniki i Czujniki</h3>
+        <div class="component-list">
+            <ul>
+                <li><strong>Sterowniki Silników:</strong> 6x TMC2209 (osie J1–J6) do silników krokowych</li>
+                <li><strong>Sterowanie Chwytaka:</strong> PWM bezpośrednio z Teensy</li>
+                 <li><strong>Enkodery (Master):</strong> 6x Enkoder obrotowy</li>
+                <li><strong>Czujniki:</strong> Krańcówki bazujące (Homing) dla osi krokowych</li>
+            </ul>
+        </div>
+
+        <h3>4.3 Zasilanie</h3>
+        <table>
+            <tr>
+                <th>Sekcja</th>
+                <th>Napięcie</th>
+                <th>Przeznaczenie</th>
+            </tr>
+            <tr>
+                <td>Silniki Krokowe</td>
+                <td>12V / 24V</td>
+                <td>Wymagany zasilacz dużej mocy</td>
+            </tr>
+            <tr>
+                <td>Logika</td>
+                <td>5V</td>
+                <td>Zasilanie mikrokontrolerów</td>
+            </tr>
+        </table>
+
+        <h3>4.4 Komunikacja</h3>
+        <ul>
+            <li><strong>Protokół:</strong> UART Serial (High Speed)</li>
+            <li><strong>Prędkość:</strong> Konfigurowalna (np. 115200 bps lub wyższa)</li>
+        </ul>
+
+        <div class="page-break"></div>
+
+        <h2 id="vision">5. System Wizyjny</h2>
+
+        <h3>5.1 Kamera i Oświetlenie</h3>
+        <ul>
+            <li><strong>Typ:</strong> USB HD 1080p lub Raspberry Pi Camera</li>
+            <li><strong>Oświetlenie:</strong> Pierścień LED z regulacją jasności</li>
+        </ul>
+
+        <div class="page-break"></div>
+
+        <h2 id="interface">6. Interfejs Kontrolny</h2>
+
+        <h3>6.1 Konstrukcja</h3>
+        <p>Panel sterujący typu <strong>Master</strong> oparty na Arduino Pro Micro.</p>
+        <ul>
+            <li>Odczyt pozycji operatora przy użyciu enkoderów</li>
+            <li>Komunikacja szeregowa z jednostką Teensy</li>
+        </ul>
+        
+        <div class="page-break"></div>
+
+         <h2 id="schematics">8. Schematy Podłączeń</h2>
+
+        <h3>8.1 Schemat Blokowy</h3>
+        <pre>
+┌─────────────┐       UART        ┌─────────────┐
+│  MASTER     │ ◄───────────────► │   SLAVE     │
+│ Arduino     │                   │  Teensy     │
+│ Pro Micro   │                   │    4.1      │
+└─────────────┘                   └──────┬──────┘
+       ▲                                 │
+       │                                 ▼
+┌──────┴──────┐                   ┌─────────────┐
+│  INTERFEJS  │                   │  STEROWNIKI │
+│ (Enkodery)  │                   │  SILNIKÓW   │
+└─────────────┘                   └──────┬──────┘
+                                         │
+                                         ▼
+                                  ┌─────────────┐
+                                  │   SILNIKI   │
+                                  │   NEMA 17   │
+                                  └─────────────┘
+        </pre>
+
+        <div class="page-break"></div>
+
+        <h2 id="assembly">9. Instrukcja Montażu</h2>
+        <p>Szczegółowa instrukcja montażu silników krokowych i kalibracji sterowników.</p>
+        <ol>
+            <li>Przykręć silniki NEMA 17 do korpusu robota.</li>
+            <li>Zainstaluj paski zębate lub sprzęgła do przekładni.</li>
+            <li>Podłącz sterowniki silników do Teensy 4.1.</li>
+            <li>Wykonaj kalibrację prądową sterowników (Vref).</li>
+        </ol>
+
+        <div class="page-break"></div>
+
+        <h2 id="maintenance">10. Konserwacja</h2>
+
+        <h3>10.1 Regularne Przeglądy</h3>
+        <table>
+            <tr>
+                <th>Częstotliwość</th>
+                <th>Zadania</th>
+                <th>Opis</th>
+            </tr>
+            <tr>
+                <td>Codziennie</td>
+                <td>Sprawdzenie zer mechanicznych</td>
+                <td>Sprawdź czy wszystkie osie są w pozycji zerowej</td>
+            </tr>
+            <tr>
+                <td>Tygodniowo</td>
+                <td>Pełna kalibracja systemu</td>
+                <td>Wykonaj pełną kalibrację wszystkich osi</td>
+            </tr>
+            <tr>
+                <td>Miesięcznie</td>
+                <td>Smarowanie łożysk</td>
+                <td>Nasmaruj wszystkie łożyska i przeguby</td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

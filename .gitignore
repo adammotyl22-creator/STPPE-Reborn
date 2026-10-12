@@ -1,0 +1,33 @@
+# Local and generated files
+/.agents/
+/.vscode/
+/scratch/
+/ORIGINAL_REQUEST.md
+WebControl-v*/
+**/.vscode/
+**/.pio/
+**/node_modules/
+**/__pycache__/
+**/dist/
+**/build/
+**/coverage/
+**/*.log
+**/*_output.txt
+**/*_out.txt
+**/test_out.txt
+**/test_out.log
+**/screenshots/
+*.elf
+*.map
+*.o
+*.a
+
+# Raw workshop photos/videos; retain the CAD assembly file
+/Pliki graficzne/Zdjecia/*
+!/Pliki graficzne/Zdjecia/*.step
+
+# Draft and temporary notes
+/Pliki graficzne/Dokumentacje/Dokoment..txt
+/Pliki graficzne/Dokumentacje/dokunemt2.txt
+/Pliki graficzne/Dokumentacje/chyba dobre osie.png
+/Pliki graficzne/Dokumentacje/Markdown to PDF.pdf

@@ -1,0 +1,213 @@
+/**
+ * left-rail.css - Left Motion Panel & Navigation Rail Layout Styles
+ * STPPE Reborn Control Studio
+ */
+
+/* Workspace navigation rail */
+.workspace-nav {
+  display: flex;
+  flex: 0 0 56px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  height: 100%;
+  padding: 6px 4px;
+  overflow: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+}
+
+.workspace-nav-btn {
+  position: relative;
+  display: flex;
+  flex: 0 0 48px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  padding: 4px 1px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.workspace-nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.workspace-nav-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.workspace-nav-btn.active {
+  color: #8fcaff;
+  background: var(--bg-control);
+  border-color: var(--border-color);
+}
+
+.workspace-nav-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.settings-panel-content {
+  display: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow: auto;
+}
+
+#left-panel.settings-view .panel-mode-tabs,
+#left-panel.settings-view .direct-drive-banner {
+  display: none !important;
+}
+
+#left-panel.settings-view #motion-panel-container > .accordion-card {
+  display: none !important;
+}
+
+#left-panel.settings-view #settings-panel-content {
+  display: flex;
+}
+
+#left-panel.motion-view [data-mode-tab="trajectory"],
+#left-panel.program-view .panel-mode-tabs {
+  display: none;
+}
+
+#left-panel.motion-view [data-accordion="trajectory"] {
+  display: none !important;
+}
+
+#left-panel.program-view [data-accordion="trajectory"] > .accordion-header {
+  display: none;
+}
+
+.settings-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.settings-panel-heading h2 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.settings-panel-heading .btn {
+  flex: 0 0 auto;
+}
+
+.mobile-optimization-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 6px 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.settings-switch {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.settings-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.settings-switch-track {
+  position: relative;
+  display: block;
+  width: 38px;
+  height: 22px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.settings-switch-track::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  content: '';
+  background: var(--text-muted);
+  border-radius: var(--radius-pill);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.settings-switch input:checked + .settings-switch-track {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.settings-switch input:checked + .settings-switch-track::after {
+  background: var(--accent-emerald-bright);
+  transform: translateX(16px);
+}
+
+.settings-switch input:focus-visible + .settings-switch-track {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.settings-panel-content .safety-execution-bar {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+}
+
+@media (max-width: 520px) {
+  .workspace-nav {
+    flex-basis: 48px;
+    padding-inline: 3px;
+  }
+
+  .workspace-nav-btn {
+    font-size: 8px;
+  }
+}
+
+/* Left Rail & Motion Layout utilities */
+.two-tab-rail {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.left-panel-docked-footer {
+  position: sticky;
+  bottom: 0;
+}

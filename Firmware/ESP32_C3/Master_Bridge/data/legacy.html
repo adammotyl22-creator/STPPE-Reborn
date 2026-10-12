@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Arm Control - Wireless</title>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  
+  :root {
+    /* Light theme - refined cream/sage with indigo+mint accents */
+  --bg: #f9fbfc;
+  --surface: #ffffff;
+  --surface2: #f3f5fa;
+  --surface3: #ececf5;
+    --border: #d8dcec;
+    --border-bright: #b6bcd4;
+
+    --accent: #4651e5b9;        /* indigo */
+    --accent-2: #66b6eb;      /* violet */
+    --accent-dim: rgba(79,70,229,0.10);
+    --accent2: var(--accent-2);
+
+    --green: #059669;
+    --green-dim: rgba(5,150,105,0.12);
+    --red: #dc2626;
+    --red-dim: rgba(220,38,38,0.12);
+    --yellow: #b45309;
+    --yellow-dim: rgba(180,83,9,0.12);
+    --cyan: #0891b2;
+    --cyan-dim: rgba(8,145,178,0.12);
+    --orange: #ea580c;
+
+    --text: #1a1d2e;
+    --text-mid: #5b6280;
+    --text-dim: #9aa1bd;
+
+    --radius: 14px;
+    --radius-sm: 10px;
+    --radius-xs: 6px;
+
+    --font: 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+    --shadow-sm: 0 1px 2px rgba(15,18,40,0.06);
+    --shadow-md: 0 4px 16px rgba(15,18,40,0.08), 0 1px 2px rgba(15,18,40,0.04);
+    --shadow-lg: 0 12px 36px rgba(15,18,40,0.12), 0 2px 6px rgba(15,18,40,0.06);
+  }
+
+  html.dark {
+    --bg: #141414;
+    --surface: #17181a;
+    --surface2: #171a24;
+    --surface3: #1f2330;
+    --border: #252a3a;
+    --border-bright: #323a55;
+
+    --accent: #396186;
+    --accent-2: #223b5a;
+    --accent-dim: rgba(99,102,241,0.14);
+    --accent2: var(--accent-2);
+
+    --green: #10d9a0;
+    --green-dim: rgba(16,217,160,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --yellow: #f59e0b;
+    --yellow-dim: rgba(245,158,11,0.12);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6,182,212,0.12);
+    --orange: #f97316;
+
+    --text: #e4e7ef;
+    --text-mid: #8b92a8;
+    --text-dim: #4a5168;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-lg: 0 12px 36px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%; margin: 0;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── HEADER ──────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 18px;
+    height: 54px;
+    display: flex; align-items: center; gap: 14px;
+    flex-shrink: 0; position: relative; z-index: 200;
+    backdrop-filter: blur(8px);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+    box-shadow: none;
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600;
+    letter-spacing: -0.01em; margin: 0;
+  }
+  header h1 span { color: var(--text-dim); font-weight: 400; }
+  .vsep { width: 1px; height: 22px; background: var(--border); }
+
+  /* connection status */
+  .conn-area { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--text-mid); }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--red);
+    box-shadow: none;
+    color: var(--red);
+    transition: all .3s; flex-shrink: 0; position: relative;
+  }
+  .dot.on { background: var(--green); color: var(--green); }
+  .dot.homing { background: var(--yellow); color: var(--yellow); }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  /* WiFi / AP info strip (ESP32 build) */
+  .ap-strip {
+    display: flex; align-items: center; gap: 8px; font-size: 11px;
+    color: var(--text-mid);
+    background: var(--accent-dim);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius-sm); padding: 4px 11px;
+  }
+  .ap-strip b { color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 600; }
+
+  /* collision toast */
+  #collision-banner {
+    display: none;
+    position: fixed; top: 70px; right: 18px;
+    background: var(--red); color: #fff;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12px; font-weight: 600;
+    letter-spacing: .04em; z-index: 500;
+    box-shadow: none;
+    animation: toastIn .35s cubic-bezier(.2,.8,.2,1);
+    max-width: 360px;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  select.baud, .ws-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px;
+    border-radius: var(--radius-sm); font-family: var(--mono);
+    font-size: 11px; outline: none; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .ws-input { width: 140px; cursor: text; }
+  select.baud:focus, .ws-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+  /* speed pill */
+  .speed-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 5px 11px;
+    font-size: 11px; color: var(--text-mid);
+    font-weight: 500;
+  }
+  .speed-pill span { font-family: var(--mono); color: var(--cyan); font-size: 12px; font-weight: 600; }
+
+  /* ─── BUTTONS ─────────────────────────────────── */
+  .btn {
+    padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid transparent;
+    font-family: var(--font); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all .15s ease;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    line-height: 1.2;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    box-shadow: none;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary:hover { box-shadow: var(--shadow-sm); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { filter: brightness(1.1); box-shadow: none; }
+  .btn-success {
+    background: var(--green); color: #04201a; font-weight: 600;
+    box-shadow: none;
+  }
+  .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-ghost {
+    background: var(--surface2); border-color: var(--border); color: var(--text-mid);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .btn-warn { background: var(--yellow); color: #1a0e00; font-weight: 600; }
+  .btn-warn:hover { filter: brightness(1.08); }
+
+  .btn-estop {
+    background: var(--red); color: #fff; font-weight: 700;
+    letter-spacing: .08em; font-size: 11px; padding: 6px 16px;
+    border: 1px solid color-mix(in srgb, var(--red) 60%, #000);
+    box-shadow: none;
+    animation: none;
+  }
+
+  /* ─── DIAG POPOVER ───────────────────────────── */
+  .diag-btn {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-mid); padding: 5px 11px;
+    border-radius: var(--radius-sm); font-family: var(--font);
+    font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s;
+  }
+  .diag-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .diag-btn.ok   { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .diag-btn.warn { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-dim); }
+  .diag-btn.fail { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+
+  #diag-pop {
+    display: none; position: absolute; top: 60px; right: 210px;
+    background: var(--surface); border: 1px solid var(--border-bright);
+    border-radius: var(--radius); padding: 14px; gap: 8px;
+    flex-direction: column; z-index: 999; min-width: 270px;
+    box-shadow: var(--shadow-lg);
+  }
+  #diag-pop.open { display: flex; }
+  .dp-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--text-dim);
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .db {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 11px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface2);
+    border-left-width: 3px; transition: all .25s;
+  }
+  .db .dd { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; transition: all .25s; }
+  .db.ok   { border-color: var(--border); border-left-color: var(--green); }
+  .db.ok .dd   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .db.fail { border-color: var(--border); border-left-color: var(--red); }
+  .db.fail .dd { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .db.warn { border-color: var(--border); border-left-color: var(--yellow); }
+  .db.warn .dd { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .db .dn { font-size: 12px; font-weight: 500; flex: 1; }
+  .db .ds { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+
+  /* ─── 3D PREVIEW POPOVER ─────────────────────── */
+  #preview-pop {
+    display: none; position: absolute; top: 60px; right: 15px;
+    background: var(--surface); border: 1px solid var(--border-bright);
+    border-radius: var(--radius); padding: 12px; gap: 10px;
+    flex-direction: column; z-index: 999; width: 460px;
+    box-shadow: var(--shadow-lg);
+  }
+  #preview-pop.open { display: flex; }
+  .pv-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--text-dim);
+    padding-bottom: 9px; border-bottom: 1px solid var(--border);
+  }
+  .pv-canvas-wrap {
+    width: 100%; height: 360px; border-radius: var(--radius-sm); overflow: hidden;
+    background: #0a0b10; border: 1px solid var(--border); position: relative;
+  }
+
+  /* ─── LAYOUT ─────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 250px 1fr 340px;
+    flex: 1; overflow: hidden; min-height: 0;
+  }
+
+  /* ─── LEFT PANEL ─────────────────────────────── */
+  .left { background: linear-gradient(180deg, var(--surface), var(--surface2)); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+
+  .ps { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+  .ps:last-child { border-bottom: none; }
+  .ps-separator { border-bottom: 2px solid var(--border); }
+  .pt {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--text-dim); margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+
+  /* ─── SLIDER CARD (template style) ──────────── */
+  .slider-card {
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .slider-card:last-child { margin-bottom: 0; }
+  .slider-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .slider-card-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slider-card-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .slider-card-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mid);
+  }
+  .slider-card-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .slider-card-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--cyan);
+    min-width: 22px;
+    text-align: right;
+  }
+  .jnt-slider-btn {
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    background: var(--surface3);
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all .15s;
+    line-height: 1.4;
+  }
+  .jnt-slider-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .jnt-slider-btn.jok { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .jnt-slider-btn.eok { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .jnt-slider-btn.off { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .slider-send-btn {
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    font-family: var(--mono);
+    font-size: 9px;
+    background: var(--surface3);
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all .15s;
+    line-height: 1.4;
+  }
+  .slider-send-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  /* ─── RANGE INPUT (Slider) ─────────────────── */
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 6px; border-radius: 9999px;
+    background: var(--border); outline: none; cursor: pointer; border: none;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    cursor: pointer; border: 2px solid var(--surface);
+    transition: transform .15s, box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.18); box-shadow: 0 0 0 6px var(--accent-dim); }
+  input[type=range]::-webkit-slider-thumb:active { transform: scale(1.1); }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--surface);
+  }
+  input[type=range]::-moz-range-track { background: transparent; border: none; }
+
+  .asnd {
+    padding: 5px 9px; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-mid);
+    font-family: var(--mono); font-size: 10px; cursor: pointer;
+    transition: all .15s; text-align: center; font-weight: 500;
+  }
+  .asnd:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+  .atog {
+    padding: 3px 0; border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim);
+    font-size: 9px; font-weight: 700; cursor: pointer;
+    transition: all .15s; text-align: center; letter-spacing: .04em;
+  }
+  .atog.jok { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .atog.eok { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .atog.off { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+
+  .gdiv {
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 10px;
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--text-dim);
+  }
+  .gdiv::before, .gdiv::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* speed override row */
+  .speed-row {
+    display: grid; grid-template-columns: 1fr 28px 54px;
+    align-items: center; gap: 9px; margin-bottom: 2px;
+  }
+  #speed-val-disp { font-family: var(--mono); font-size: 11px; color: var(--cyan); text-align: right; font-weight: 600; }
+
+  /* telem cells */
+  .tg  { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 7px; }
+  .tg2 { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+  .tc {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 9px;
+    transition: border-color .15s;
+  }
+  .tc label { display: block; font-size: 8px; color: var(--text-dim); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .tv { font-family: var(--mono); font-size: 20px; color: var(--cyan); font-weight: 500; text-shadow: none; }
+  .tv.xyz { color: var(--accent); font-size: 15px; text-shadow: none; }
+  .tc.highlight { border-color: var(--accent); }
+
+  /* quick commands */
+  .cg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cb {
+    padding: 7px 9px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-mid); font-family: var(--font);
+    font-size: 10.5px; font-weight: 500; cursor: pointer;
+    transition: all .15s; text-align: center;
+  }
+  .cb:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+  .cb.green:hover  { background: var(--green-dim);  border-color: var(--green);  color: var(--green); }
+  .cb.red:hover    { background: var(--red-dim);    border-color: var(--red);    color: var(--red); }
+  .cb.yellow:hover { background: var(--yellow-dim); border-color: var(--yellow); color: var(--yellow); }
+  .cb.cyan:hover   { background: var(--cyan-dim);   border-color: var(--cyan);   color: var(--cyan); }
+
+  /* ─── CENTER ─────────────────────────────────── */
+  .center { display: flex; flex-direction: column; overflow: hidden; padding: 16px; gap: 0; background: var(--bg); }
+
+  .tabbar { display: flex; gap: 4px; margin-bottom: 14px; flex-shrink: 0; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); width: fit-content; }
+  .tab {
+    padding: 7px 16px; border-radius: var(--radius-xs);
+    border: 1px solid transparent; background: transparent;
+    color: var(--text-mid); font-family: var(--font);
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    transition: all .18s; position: relative;
+  }
+  .tab:hover { color: var(--text); background: var(--surface2); }
+  .tab.on {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  .tc-content { display: none; flex-direction: column; gap: 14px; overflow-y: auto; flex: 1; padding-right: 4px; opacity: 0; transition: opacity .15s; }
+  .tc-content.on { display: flex; opacity: 1; }
+
+  .card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
+      var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; flex-shrink: 0;
+    box-shadow: var(--shadow-md);
+  }
+  .card-t {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--text-dim); margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* IK fields */
+  .ikg { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 12px; }
+  .ikf label { display: block; font-size: 9px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .ikf input, .ikf select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 11px;
+    font-family: var(--mono); font-size: 15px; color: var(--text); outline: none;
+    transition: border .15s, box-shadow .15s; box-sizing: border-box;
+  }
+  .ikf input:focus, .ikf select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .ik-invalid { border-color: var(--red) !important; box-shadow: 0 0 0 3px var(--red-dim) !important; }
+  .ik-ws-status { font-size: 11px; margin: -2px 0 12px; min-height: 14px; font-weight: 500; }
+  .ik-ws-ok  { color: var(--green); }
+  .ik-ws-bad { color: var(--red); }
+
+  .dur-row { display: grid; grid-template-columns: 70px 1fr 64px; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .dur-lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .dur-val { font-family: var(--mono); font-size: 11px; color: var(--text); text-align: right; font-weight: 500; }
+
+  /* FK result bar */
+  .fk-bar {
+    background: var(--surface2); border: 1px solid var(--border-bright);
+    border-radius: var(--radius-sm); padding: 9px 13px; margin-bottom: 12px;
+    font-family: var(--mono); font-size: 11px; color: var(--text-mid);
+    display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .fk-bar span { color: var(--text); }
+  .fk-err-ok  { color: var(--green) !important; }
+  .fk-err-bad { color: var(--yellow) !important; }
+  .motion-est {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin: 0 0 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    flex-wrap: wrap;
+  }
+  .motion-est span span { color: var(--text); font-weight: 700; }
+
+  /* PID grid */
+  .pig { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 11px; }
+  .pif label { display: block; font-size: 9px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .pif input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 11px;
+    font-family: var(--mono); font-size: 14px; color: var(--text); outline: none;
+  }
+  .pmeta {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+    text-align: center; padding-top: 9px; border-top: 1px solid var(--border);
+  }
+
+  /* Sequencer */
+  .seq-controls { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  #seq-scroll { max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 12px; background: var(--surface2); }
+  #seq-table { width: 100%; font-size: 10px; border-collapse: collapse; }
+  #seq-table thead th {
+    font-family: var(--mono); font-size: 9px; color: var(--text-dim);
+    text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border);
+    background: var(--surface3); position: sticky; top: 0; font-weight: 600;
+  }
+  #seq-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+  #seq-table tbody tr:last-child { border-bottom: none; }
+  #seq-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  #seq-table tbody td { font-family: var(--mono); padding: 6px 9px; color: var(--text-mid); }
+  #seq-table tbody tr.playing { background: var(--accent-dim); }
+  #seq-table tbody tr.playing td { color: var(--accent); font-weight: 600; }
+  #seq-editor { width: 100%; min-height: 180px; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; resize: vertical; outline: none; margin-bottom: 12px; }
+  #seq-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  #seq-list-preview { display: grid; gap: 8px; }
+  #seq-list-preview .seq-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-family: var(--mono); font-size: 12px; color: var(--text); }
+  #seq-list-preview .seq-row.playing { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+
+  /* SD Card tab */
+  .sd-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 9px; align-items: center; margin-bottom: 13px; }
+  .sd-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 9px 13px;
+    font-family: var(--mono); font-size: 13px; color: var(--text); outline: none;
+    transition: border .15s, box-shadow .15s; width: 100%; box-sizing: border-box;
+  }
+  .sd-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  #sd-list { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .sd-item {
+    display: grid; grid-template-columns: 1fr auto auto auto;
+    align-items: center; gap: 7px; padding: 9px 12px;
+    border-bottom: 1px solid var(--border); transition: background .15s;
+  }
+  .sd-item:last-child { border-bottom: none; }
+  .sd-item:hover { background: var(--surface2); }
+  .sd-name { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 500; }
+  .sd-empty { padding: 22px; text-align: center; font-size: 11px; color: var(--text-dim); }
+  .sd-angles { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+  /* homing panel */
+  .home-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+  .hbtn {
+    padding: 11px 5px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-mid); font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all .15s; text-align: center;
+  }
+  .hbtn:hover { background: var(--yellow-dim); border-color: var(--yellow); color: var(--yellow); transform: translateY(-1px); }
+  .hbtn.full { border-color: var(--green); color: var(--green); }
+  .hbtn.full:hover { background: var(--green-dim); }
+
+  /* axis config table */
+  .act { width: 100%; font-size: 11px; border-collapse: collapse; font-family: var(--mono); }
+  .act thead th { padding: 7px 8px; text-align: left; color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--border); text-transform: uppercase; font-size: 9px; letter-spacing: .08em; }
+  .act tbody td { padding: 7px 8px; }
+  .act tbody tr { border-bottom: 1px solid var(--border); }
+  .act tbody tr:last-child { border-bottom: none; }
+
+  /* ─── JOGGING GRID BUTTONS ───────────────────── */
+  .jog-spanel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .jog-sheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 6px;
+  }
+  .jog-stitle {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-mid);
+  }
+  .jog-stabs {
+    display: flex;
+    gap: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    padding: 2px;
+  }
+  .jog-stab {
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .jog-stab:hover { color: var(--text); }
+  .jog-stab.active {
+    background: rgba(79,70,229,0.10);
+    color: var(--accent);
+  }
+  html.dark .jog-stab.active {
+    background: rgba(99, 113, 241, 0.212);
+    color: var(--accent);
+  }
+  .jog-sbody {
+    padding: 12px;
+  }
+  .jog-ssteps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .step-sbtn {
+    flex: 1;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-mid);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .step-sbtn:hover { color: var(--text); }
+  .step-sbtn.active {
+    border-color: rgba(79,70,229,0.40);
+    background: rgba(79,70,229,0.10);
+    color: var(--accent);
+  }
+  html.dark .step-sbtn.active {
+    border-color: rgba(99,102,241,0.40);
+    background: rgba(99,102,241,0.14);
+    color: var(--accent);
+  }
+  .jog-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 3px;
+  }
+  .jog-btn {
+    height: 28px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .12s;
+    user-select: none;
+    padding: 0;
+  }
+  .jog-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .jog-btn:active {
+    transform: scale(0.95);
+  }
+  .jog-btn.accent {
+    color: var(--cyan);
+    border-color: var(--cyan-dim);
+    background: var(--surface3);
+  }
+  .jog-btn.accent:hover {
+    border-color: var(--cyan);
+    background: var(--cyan-dim);
+  }
+  .jog-label {
+    color: var(--text-dim);
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .jog-kbd {
+    background: var(--surface3); border: 1px solid var(--border-bright);
+    border-radius: 4px; padding: 2px 6px; font-family: var(--mono);
+    font-size: 9px; color: var(--text-mid); margin: 0 1px;
+    box-shadow: 0 1px 0 var(--border);
+  }
+  /* ─── MICRO MANIPULATOR JOYSTICK ─────────────── */
+  .micro-panel { display: flex; flex-direction: column; gap: 11px; }
+  .joystick-row { display: flex; gap: 12px; align-items: flex-start; }
+  .joystick-wrap { position: relative; width: 116px; height: 116px; flex-shrink: 0; }
+
+  #joystick-pad {
+    width: 116px; height: 116px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--surface3), var(--surface2) 60%, var(--surface));
+    border: 1px solid var(--border-bright);
+    position: relative; cursor: crosshair; user-select: none; touch-action: none;
+    transition: border-color .15s, box-shadow .15s;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+  }
+  #joystick-pad:hover { border-color: var(--accent); }
+  #joystick-pad.active { border-color: var(--accent); box-shadow: inset 0 2px 8px rgba(0,0,0,0.12), 0 0 0 4px var(--accent-dim); }
+  #joystick-pad::before { content: ''; position: absolute; left: 50%; top: 12%; bottom: 12%; width: 1px; background: var(--border); transform: translateX(-50%); }
+  #joystick-pad::after  { content: ''; position: absolute; top: 50%; left: 12%; right: 12%; height: 1px; background: var(--border); transform: translateY(-50%); }
+
+  #joystick-handle {
+    position: absolute; width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: none;
+    top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none;
+  }
+
+  .joystick-deadzone {
+    position: absolute; width: 22px; height: 22px; border-radius: 50%;
+    border: 1px dashed var(--border-bright); top: 50%; left: 50%;
+    transform: translate(-50%,-50%); pointer-events: none;
+  }
+
+  .joystick-info { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .jog-step-row { display: flex; gap: 4px; }
+  .jog-step-btn {
+    flex: 1; padding: 6px 0; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-mid); font-family: var(--mono); font-size: 10px;
+    cursor: pointer; text-align: center; transition: all .15s; font-weight: 500;
+  }
+  .jog-step-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .jog-step-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  /* ─── AXIS SLIDERS (Left Panel Jog) ─────────────── */
+  .ax-v { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .ax-v:last-child { margin-bottom: 0; }
+  .ax-h { display: flex; justify-content: space-between; align-items: center; }
+  .ax-v label { font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .1em; }
+  .av { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ik-ws-ok  { color: var(--green);  background: var(--green-dim);  border-radius: 4px; padding: 3px 7px; font-size: 10px; font-family: var(--mono); }
+  .ik-ws-bad { color: var(--red);    background: var(--red-dim);    border-radius: 4px; padding: 3px 7px; font-size: 10px; font-family: var(--mono); }
+
+  .pos-display { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 11px; }
+
+  .pos-display-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+  .pos-display-row:last-child { margin-bottom: 0; }
+  .pos-axis-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+  .pos-axis-val   { font-family: var(--mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+
+  .jog-keys-hint { font-size: 9px; color: var(--text-dim); text-align: center; line-height: 1.6; }
+  .jog-keys-hint kbd {
+    background: var(--surface3); border: 1px solid var(--border-bright);
+    border-radius: 4px; padding: 2px 5px; font-family: var(--mono);
+    font-size: 9px; color: var(--text-mid); margin: 0 1px;
+    box-shadow: 0 1px 0 var(--border);
+  }
+
+  .dpad { display: grid; grid-template-columns: repeat(3,30px); grid-template-rows: repeat(3,30px); gap: 3px; }
+  .dpad-btn {
+    border-radius: 5px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-mid);
+    font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .1s; user-select: none;
+  }
+  .dpad-btn:active, .dpad-btn.pressed {
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .dpad-blank { background: transparent; border: none; }
+
+  /* ─── RIGHT PANEL ────────────────────────────── */
+  .right {
+    background: linear-gradient(180deg, var(--surface), var(--surface2)); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+    min-width: 240px; max-width: 600px; resize: horizontal;
+  }
+  .thdr {
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .thdr span {
+    font-family: var(--font-display);
+    font-size: 10px; font-weight: 700; color: var(--text-dim);
+    flex: 1; text-transform: uppercase; letter-spacing: .14em;
+  }
+
+  #term { flex: 1; overflow-y: auto; padding: 10px 14px; font-family: var(--mono); font-size: 10.5px; line-height: 1.7; }
+  #term > div { padding: 1px 0 1px 9px; border-radius: 0 4px 4px 0; transition: background .12s; }
+  #term > div:hover { background: var(--surface2); }
+  .ls { color: var(--accent); border-left: 3px solid var(--accent); }
+  .lr { color: var(--green);  border-left: 3px solid var(--green); }
+  .le { color: var(--red);    border-left: 3px solid var(--red); }
+  .li { color: var(--text-mid); border-left: 3px solid var(--text-dim); }
+  .lw { color: var(--yellow); border-left: 3px solid var(--yellow); }
+  .lp { color: var(--cyan);   border-left: 3px solid var(--cyan); }
+  .lh { color: var(--orange); border-left: 3px solid var(--orange); }
+
+  .tinput-row { padding: 9px 11px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-shrink: 0; background: var(--surface); }
+  #mi {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 11px;
+    font-family: var(--mono); font-size: 11px; color: var(--text); outline: none;
+    transition: border .15s, box-shadow .15s;
+  }
+  #mi:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .sbtn {
+    padding: 8px 14px; border-radius: var(--radius-sm); border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font-size: 11px; font-weight: 600;
+    cursor: pointer; font-family: var(--font); transition: all .15s;
+    box-shadow: none;
+  }
+  .sbtn:hover { transform: translateY(-1px); box-shadow: none; }
+
+  /* cmd history */
+  .hist-btn {
+    position: absolute; right: 0; bottom: calc(100% + 4px);
+    background: var(--surface); border: 1px solid var(--border-bright);
+    border-radius: var(--radius-sm); padding: 5px 0; min-width: 200px;
+    font-family: var(--mono); font-size: 10px; z-index: 100; display: none;
+    box-shadow: var(--shadow-md);
+  }
+  .hist-btn.open { display: block; }
+  .hist-item { padding: 5px 13px; color: var(--text-mid); cursor: pointer; }
+  .hist-item:hover { background: var(--accent-dim); color: var(--accent); }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+  /* ─── FOOTER ─────────────────────────────────────── */
+  footer {
+    background: color-mix(in srgb, var(--surface) 100%, transparent);
+    border-top: 1px solid var(--border);
+    padding: 6px 18px;
+    display: flex; align-items: center; gap: 18px; flex-shrink: 0;
+    flex-wrap: nowrap; min-height: 54px;
+    backdrop-filter: blur(8px);
+  }
+  .footer-section {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .footer-section-label {
+    font-family: var(--font-display);
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--text-dim);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .footer-speed-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .footer-speed-val {
+    font-family: var(--mono); font-size: 12px; color: var(--cyan); font-weight: 600; min-width: 36px; text-align: right;
+  }
+  .footer-speed-row input[type=range] {
+    width: 140px;
+  }
+  .footer-telem-row {
+    display: flex; align-items: center; gap: 5px;
+  }
+  .footer-tcell {
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-xs); padding: 3px 6px;
+    min-width: 42px;
+  }
+  .footer-tcell label {
+    font-size: 7px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; line-height: 1;
+  }
+  .footer-tcell .tv {
+    font-family: var(--mono); font-size: 11px; color: var(--cyan); font-weight: 500;
+  }
+  .footer-tcell .tv.xyz { color: var(--accent); font-size: 10px; }
+  .footer-spacer { flex: 1; }
+  .footer-divider {
+    width: 1px; height: 26px; background: var(--border); flex-shrink: 0;
+  }
+
+  /* ─── CUSTOM CHECKBOX (toggle) ─────────────────── */
+  .ck-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ck-wrap input[type="checkbox"] {
+    display: none;
+  }
+  .ck-track {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    background: var(--border);
+    border: 1px solid var(--border-bright);
+    border-radius: 9999px;
+    flex-shrink: 0;
+    transition: background .22s, border-color .22s, box-shadow .22s;
+  }
+  .ck-track::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: transform .22s cubic-bezier(.4,.0,.2,1), background .22s, box-shadow .22s;
+  }
+  .ck-wrap input[type="checkbox"]:checked + .ck-track {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .ck-wrap input[type="checkbox"]:checked + .ck-track::after {
+    transform: translateX(14px);
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  }
+  .ck-wrap:hover .ck-track {
+    border-color: var(--accent);
+  }
+  .ck-wrap input[type="checkbox"]:checked + .ck-track:hover {
+    box-shadow: 0 0 0 4px var(--accent-dim);
+  }
+
+  /* responsive */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 260px 1fr 300px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="collision-banner">COLLISION DETECTED - Check joints before resuming</div>
+
+<!-- ─── HEADER ────────────────────────────────────── -->
+<header>
+  <div class="brand">
+    <h1>STPPE <span> / Wireless</span></h1>
+  </div>
+
+
+  <div class="conn-area">
+    <div class="dot" id="dot"></div>
+    <span id="stext">Disconnected</span>
+  </div>
+
+  <!-- speed pill in header -->
+  <div class="speed-pill">
+    SPD <span id="hdr-speed">100%</span>
+  </div>
+  <div class="speed-pill" id="robot-state-pill" title="Robot state from telemetry">
+    STATE <span id="robot-state">OFFLINE</span>
+  </div>
+
+
+
+  <div class="header-right">
+    <!-- WS IP input -->
+    <input class="ws-input" id="ws-ip" type="text" value="192.168.4.1" placeholder="ESP32 IP…" title="ESP32 WebSocket IP address" />
+
+    <button class="diag-btn" id="diag-btn" onclick="toggleDiag()">
+      <span class="dot" id="diag-dot" style="width:6px;height:6px;background:var(--text-dim)"></span>
+      Drivers
+    </button>
+
+    <button class="diag-btn" id="preview-btn" onclick="toggle3DView()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      3D VIEW
+    </button>
+
+    <button class="btn btn-ghost" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" style="padding:5px 10px;font-size:12px;line-height:1;">Theme</button>
+
+    <button class="btn btn-primary" id="con-btn" onclick="toggleConnect()">Connect</button>
+    <button class="btn btn-success" id="reenable-btn" style="display:none;margin-left:8px;" onclick="doReenable()">RE-ENABLE</button>
+    <button class="btn btn-estop" id="estop-btn" style="display:none;margin-left:8px;" onclick="doEstop()">E-STOP</button>
+  </div>
+
+  <!-- diag popover -->
+  <div id="diag-pop">
+    <div class="dp-hdr">
+      Driver Status
+      <button class="btn btn-ghost" style="padding:3px 9px;font-size:10px;" onclick="runDiag()">Refresh</button>
+    </div>
+    <div class="db" id="db1"><div class="dd"></div><span class="dn">J1 - Base</span><span class="ds">-</span></div>
+    <div class="db" id="db2"><div class="dd"></div><span class="dn">J2 - Shoulder</span><span class="ds">-</span></div>
+    <div class="db" id="db3"><div class="dd"></div><span class="dn">J3 - Elbow</span><span class="ds">-</span></div>
+  </div>
+
+  <!-- preview popover -->
+  <div id="preview-pop">
+    <div class="pv-hdr">
+      <span>3D Kinematics Preview</span>
+      <select id="preview-mode" onchange="update3DTarget()" style="background:var(--surface2); border:1px solid var(--border); color:var(--accent); font-family:var(--mono); font-size:10px; font-weight:600; border-radius:3px; outline:none; padding:4px 8px; cursor:pointer;">
+        <option value="TARGET">Mode: TARGET (UI Inputs)</option>
+        <option value="LIVE">Mode: LIVE (Telemetry)</option>
+      </select>
+    </div>
+    <div class="pv-canvas-wrap" id="pv-canvas-container"></div>
+  </div>
+</header>
+
+<!-- ─── LAYOUT ─────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left">
+
+    <!-- Cartesian jog -->
+    <div class="ps">
+      <div class="jog-spanel">
+        <div class="jog-sheader">
+          <span class="jog-stitle">CARTESIAN JOG</span>
+          <div class="jog-stabs">
+            <button class="jog-stab active" onclick="setCoordMode('cart')" id="mode-cart">XYZ</button>
+            <button class="jog-stab" onclick="setCoordMode('cyl')" id="mode-cyl">R/θ/Z</button>
+          </div>
+        </div>
+        <div class="jog-sbody">
+          <div class="jog-ssteps">
+            <button class="step-sbtn" onclick="setJogDelta(1)" id="jd1">1mm</button>
+            <button class="step-sbtn active" onclick="setJogDelta(5)" id="jd5">5mm</button>
+            <button class="step-sbtn" onclick="setJogDelta(10)" id="jd10">10mm</button>
+            <button class="step-sbtn" onclick="setJogDelta(25)" id="jd25">25mm</button>
+          </div>
+          <div class="jog-grid">
+            <div></div>
+            <button class="jog-btn" onclick="stepJog('y',1)" title="Y+ (W)">▲</button>
+            <button class="jog-btn accent" onclick="stepJog('z',1)" title="Z+ (Q)">▲▲</button>
+            <button class="jog-btn" onclick="stepJog('x',-1)" title="X- (A)">◀</button>
+            <span class="jog-label">◌</span>
+            <button class="jog-btn" onclick="stepJog('x',1)" title="X+ (D)">▶</button>
+            <div></div>
+            <button class="jog-btn" onclick="stepJog('y',-1)" title="Y- (S)">▼</button>
+            <button class="jog-btn accent" onclick="stepJog('z',-1)" title="Z- (E)">▼▼</button>
+          </div>
+          <!-- XYZ sliders (synced with IK tab) -->
+          <div id="sliders-cart" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+            <div class="ax-v"><div class="ax-h"><label>X axis</label><span class="av" id="side-x-v">0mm</span></div><input type="range" id="side-x" min="-280" max="280" value="0" oninput="jogSlider('x')"></div>
+            <div class="ax-v"><div class="ax-h"><label>Y axis</label><span class="av" id="side-y-v">0mm</span></div><input type="range" id="side-y" min="-280" max="280" value="0" oninput="jogSlider('y')"></div>
+            <div class="ax-v"><div class="ax-h"><label>Z axis</label><span class="av" id="side-z-v">215mm</span></div><input type="range" id="side-z" min="20" max="440" value="215" oninput="jogSlider('z')"></div>
+          </div>
+          <!-- Cylindrical sliders -->
+          <div id="sliders-cyl" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+            <div class="ax-v"><div class="ax-h"><label>R — reach (mm)</label><span class="av" id="cyl-r-v">150mm</span></div><input type="range" id="cyl-r" min="10" max="280" value="150" oninput="jogCyl()"></div>
+            <div class="ax-v"><div class="ax-h"><label>θ — rotation (°)</label><span class="av" id="cyl-t-v">0°</span></div><input type="range" id="cyl-t" min="-85" max="85" value="0" oninput="jogCyl()"></div>
+            <div class="ax-v"><div class="ax-h"><label>Z — height (mm)</label><span class="av" id="cyl-z-v">215mm</span></div><input type="range" id="cyl-z" min="20" max="440" value="215" oninput="jogCyl()"></div>
+          </div>
+          <div id="jogging-ws-status" class="ik-ws-status" style="margin-top:8px;">Workspace check: OK</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Joints -->
+    <div class="ps">
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J1 Base</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j1-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D1','j1')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt1" onclick="togJnt(1)">JNT</button>
+            <button class="jnt-slider-btn eok" id="t-enc1" onclick="togEnc(1)">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j1" min="-90" max="90" value="0" oninput="upSlider('j1')">
+      </div>
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J2 Shoulder</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j2-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D2','j2')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt2" onclick="togJnt(2)">JNT</button>
+            <button class="jnt-slider-btn eok" id="t-enc2" onclick="togEnc(2)">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j2" min="-65" max="115" value="0" oninput="upSlider('j2')">
+      </div>
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J3 Elbow</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j3-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D3','j3')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt3" onclick="togJnt(3)">JNT</button>
+            <button class="jnt-slider-btn eok" id="t-enc3" onclick="togEnc(3)">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j3" min="-35" max="170" value="0" oninput="upSlider('j3')">
+      </div>
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J4 Forearm</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j4-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D4','j4')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt4" onclick="togJnt(4)">JNT</button>
+            <button class="jnt-slider-btn off" id="t-enc4" style="opacity:.35;cursor:default" title="Stepper J4">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j4" min="-90" max="90" value="0" oninput="upSlider('j4')">
+      </div>
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J5 Wrist Pitch</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j5-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D5','j5')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt5" onclick="togJnt(5)">JNT</button>
+            <button class="jnt-slider-btn off" id="t-enc5" style="opacity:.35;cursor:default" title="Stepper J5">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j5" min="-90" max="90" value="0" oninput="upSlider('j5')">
+      </div>
+      <div class="slider-card">
+        <div class="slider-card-header">
+          <div class="slider-card-left">
+            <span class="slider-card-lbl"> J6 Tool Roll</span>
+          </div>
+          <div class="slider-card-right">
+            <span class="slider-card-num" id="j6-v">0°</span>
+            <button class="slider-send-btn" onclick="sendAx('D6','j6')">→</button>
+            <button class="jnt-slider-btn jok" id="t-jnt6" onclick="togJnt(6)">JNT</button>
+            <button class="jnt-slider-btn off" id="t-enc6" style="opacity:.35;cursor:default" title="Stepper J6">ENC</button>
+          </div>
+        </div>
+        <input type="range" id="j6" min="-180" max="180" value="0" oninput="upSlider('j6')">
+      </div>
+
+    </div>
+
+    <!-- Quick Commands -->
+    <div class="ps">
+      <div class="pt">Quick Commands</div>
+      <div class="cg">
+        <button class="cb green"  onclick="send('HOME SWITCH')">HOME ALL</button>
+        <button class="cb red"    onclick="send('STOP')" style="font-weight:700;">SOFT STOP</button>
+        <button class="cb"        onclick="send('ENC')">ENC</button>
+        <button class="cb"        onclick="runDiag()">DIAG</button>
+        <button class="cb"        onclick="send('CL_ON')">CL ON</button>
+        <button class="cb red"    onclick="send('CL_OFF')">CL OFF</button>
+        <button class="cb yellow" onclick="send('ENCCHECK')">ENCCHECK</button>
+        <button class="cb cyan"   onclick="send('SAVECFG')">SAVECFG</button>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- CENTER PANEL -->
+  <div class="center">
+    <div class="tabbar">
+      <button class="tab on" onclick="swTab('ik',this)">IK Move</button>
+      <button class="tab"    onclick="swTab('seq',this)">Sequencer</button>
+      <button class="tab"    onclick="swTab('sd',this)">Teach</button>
+      <button class="tab"    onclick="swTab('homing',this)">Homing</button>
+      <button class="tab"    onclick="swTab('pid',this)">Config</button>
+    </div>
+
+    <!-- IK TAB -->
+    <div class="tc-content on" id="tab-ik">
+      <div class="card">
+        <div class="card-t" style="display:flex; justify-content:space-between; align-items:center;">
+          Inverse Kinematics - Target Position
+          <button class="btn btn-ghost" style="padding:2px 8px; font-size:10px;" onclick="ikGoHome()" title="Reset inputs to Home Position">🏠 Return Home</button>
+        </div>
+        <div class="ikg">
+          <div class="ikf"><label>X (mm) <span style="color:var(--text-dim);font-weight:400;">(+ przód / - tył)</span></label><input type="number" id="ik-x" value="0" step="1" min="-280" max="280" oninput="jogFromIK('x')"></div>
+          <div class="ikf"><label>Y (mm) <span style="color:var(--text-dim);font-weight:400;">(+ lewo / - prawo)</span></label><input type="number" id="ik-y" value="0" step="1" min="-280" max="280" oninput="jogFromIK('y')"></div>
+          <div class="ikf"><label>Z (mm) <span style="color:var(--text-dim);font-weight:400;">(+ góra / - dół)</span></label><input type="number" id="ik-z" value="215" step="1" min="20" max="440" oninput="jogFromIK('z')"></div>
+        </div>
+        <div class="ikg" style="margin-top:8px;">
+          <div class="ikf">
+            <label>Wrist preset (W)</label>
+            <select id="ik-wrist" onchange="updateWristModeUI()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+              <option value="0">W0 level</option><option value="1">W1 down_0</option><option value="2">W2 down_90</option><option value="3">W3 pitch0</option><option value="4">W4 pitch90</option><option value="5">W5 pitch180</option><option value="6">W6 manual</option>
+            </select>
+          </div>
+          <div class="dur-row"><span class="dur-lbl">J4</span><input type="range" id="ik-j4" min="-90" max="90" step="1" value="0" oninput="upSlider('ik-j4');ikWorkspaceCheck();if(typeof update3DTarget!=='undefined')update3DTarget()"><span class="dur-val" id="ik-j4-v">0°</span></div>
+          <div class="dur-row"><span class="dur-lbl">J5</span><input type="range" id="ik-j5" min="-90" max="90" step="1" value="0" oninput="upSlider('ik-j5');ikWorkspaceCheck();if(typeof update3DTarget!=='undefined')update3DTarget()"><span class="dur-val" id="ik-j5-v">0°</span></div>
+          <div class="dur-row"><span class="dur-lbl">J6</span><input type="range" id="ik-j6" min="-180" max="180" step="1" value="0" oninput="upSlider('ik-j6');ikWorkspaceCheck();if(typeof update3DTarget!=='undefined')update3DTarget()"><span class="dur-val" id="ik-j6-v">0°</span></div>
+        </div>
+        <div id="ik-ws-status" class="ik-ws-status">Workspace check: waiting...</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label class="ck-wrap"><input type="checkbox" id="ik-autosnap"><span class="ck-track"></span><span style="font-size:10px;color:var(--text-mid);">Suggest nearest valid workspace point</span></label>
+        </div>
+        <div class="dur-row"><span class="dur-lbl">Duration</span><input type="range" id="ik-dur" min="200" max="5000" step="100" value="1000" oninput="upDur()"><span class="dur-val" id="ik-dur-v">1000ms</span></div>
+        <div class="motion-est" id="motion-est">
+          <span>Move <span id="move-time">--</span></span>
+          <span>Arrive <span id="move-eta">--</span></span>
+          <span>TCP <span id="move-dist">--</span></span>
+          <span>Avg <span id="move-speed">--</span></span>
+        </div>
+        <div class="fk-bar" id="fk-bar">
+          <span style="color:var(--text-dim)">Last position:</span>
+          J1 <span id="fk-j1">-</span>° J2 <span id="fk-j2">-</span>° J3 <span id="fk-j3">-</span>°
+          <span style="color:var(--yellow)">J4</span> <span id="fk-j4" style="color:var(--yellow)">-</span>°
+          <span style="color:var(--yellow)">J5</span> <span id="fk-j5" style="color:var(--yellow)">-</span>°
+          <span style="color:var(--yellow)">J6</span> <span id="fk-j6" style="color:var(--yellow)">-</span>°
+          FK error <span id="fk-err">-</span>mm
+        </div>
+        <button id="ik-send-btn" class="btn btn-primary" style="width:100%;padding:10px;font-size:13px;" onclick="sendIK()">▶ Execute MOV</button>
+      </div>
+      <div class="card" style="background:var(--surface2);border-color:var(--border-bright);">
+        <div class="card-t" style="margin-bottom:8px;">Workspace Info</div>
+        <div style="font-size:11px;color:var(--text-dim);line-height:1.8;">
+          Geometry: <span style="color:var(--text);font-family:var(--mono)">BASE_H=143.9mm · L1=185.8mm · L2=225.5mm · L3=36.1mm</span><br>
+          Reach: <span style="color:var(--text);font-family:var(--mono)">80mm – 447mm</span><br>
+          Format: <span style="color:var(--accent);font-family:var(--mono)">MOV / MOVL / G0 / G1 / JOGX</span><br>
+          Firmware: <span style="color:var(--green);font-family:var(--mono)">v3.1.0+</span> · G-code · JOG XYZ · TEACH EEPROM<br>
+          Response: <span style="color:var(--green);font-family:var(--mono)">A&lt;j1&gt;B&lt;j2&gt;C&lt;j3&gt;...G&lt;x&gt;H&lt;y&gt;I&lt;z&gt;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEQUENCER TAB -->
+    <div class="tc-content" id="tab-seq">
+      <div class="card">
+        <div class="card-t">Waypoint Sequencer - Script Editor<div style="display:flex;gap:5px;">
+            <button class="btn btn-ghost" style="padding:3px 9px;font-size:10px;" onclick="clearSeq()">Clear</button>
+            <button class="btn btn-primary" style="padding:3px 11px;font-size:10px;" onclick="recPose()">Record</button>
+            <button class="btn btn-ghost" style="padding:3px 11px;font-size:10px;" onclick="addWait()">Wait</button>
+          </div></div>
+        <textarea id="seq-editor" spellcheck="false" placeholder="MOV X0 Y0 Z215 W0 J4 90 J5 90 D1000&#10;WAIT 1000&#10;MOVL X100 Y0 Z220 W1 J4 90 J5 90 D1200" oninput="markSeqDirty()" style="font-family:var(--mono);font-size:13px;line-height:1.6;width:100%;min-height:180px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;color:var(--text);resize:vertical;outline:none;"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success" id="play-btn" onclick="isPlaying?stopSeq():playSeq()">Play</button>
+            <button class="btn btn-ghost" style="padding:9px 13px;" onclick="exportSeq()" title="Export">Export</button>
+            <button class="btn btn-ghost" style="padding:9px 13px;" onclick="document.getElementById('seq-fi').click()" title="Import">Import</button>
+            <button class="btn btn-ghost" style="padding:9px 13px;" onclick="syncSeqEditorToSequence()" title="Sync editor">Sync</button>
+          </div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">Script syntax: MOV / MOVL / WAIT</span>
+        </div>
+        <input type="file" id="seq-fi" accept=".json,.txt,application/json,text/plain" style="display:none" onchange="importSeq(event)">
+      </div>
+      <div class="card" style="background:var(--surface2);border-color:var(--border-bright);">
+        <div class="card-t">Sequence Preview</div>
+        <div id="seq-list-preview"></div>
+      </div>
+    </div>
+
+    <!-- TEACH TAB (EEPROM on Teensy - no PC/SD required) -->
+    <div class="tc-content" id="tab-sd">
+      <div class="card">
+        <div class="card-t">Teach &amp; Playback (standalone on Teensy)</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+          <button class="btn btn-ghost" onclick="send('TEACH START')">Record</button>
+          <button class="btn btn-primary" onclick="send('TEACH RECORD')">+ Point</button>
+          <button class="btn btn-ghost" onclick="send('TEACH STOP')">Stop</button>
+          <button class="btn btn-success" onclick="send('TEACH PLAY')">Play</button>
+          <button class="btn btn-ghost" onclick="send('TEACH CLEAR')">Clear</button>
+          <button class="btn btn-ghost" onclick="send('TEACH DUMP')">Dump</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn btn-primary" onclick="send('TEACH SAVE')">Save EEPROM</button>
+          <button class="btn btn-ghost" onclick="send('TEACH LOAD')">Load EEPROM</button>
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:10px;line-height:1.7;">
+          Programs survive power cycle after <span style="font-family:var(--mono);color:var(--accent)">TEACH SAVE</span>.<br>
+          G-code also works via Serial: <span style="font-family:var(--mono);color:var(--text-mid)">G0 X100 Y0 Z220 F1200</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOMING TAB -->
+    <div class="tc-content" id="tab-homing">
+      <div class="card">
+        <div class="card-t">Homing - Physical Limit Switch Sequence</div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:10px;color:var(--text-dim);margin-bottom:4px;display:block;">Homing Method</label>
+          <select id="home-method" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+            <option value="SWITCH">Endstop Switches</option>
+            <option value="ENCODER">Encoders</option>
+            <option value="MANUAL">Manual Positioning</option>
+          </select>
+        </div>
+        <div class="home-grid">
+          <button class="hbtn full" onclick="send('HOME ' + document.getElementById('home-method').value)">HOME ALL</button>
+          <button class="hbtn" onclick="send('HOMEJ1')">J1 Only</button>
+          <button class="hbtn" onclick="send('HOMEJ2')">J2 Only</button>
+          <button class="hbtn" onclick="send('HOMEJ3')">J3 Only</button>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text-dim);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;">
+          <strong>Methods:</strong><br>
+          <span style="color:var(--text)">Switches: Drive to limit switches</span><br>
+          <span style="color:var(--text)">Encoders: Calibrate offsets to current position</span><br>
+          <span style="color:var(--text)">Manual: Set current position as home</span><br>
+          Sequence (Switches): <span style="color:var(--text)">Drive fast → hit limit → back off → drive slow → hit limit → zero</span><br>
+          Limit switch pins: <span style="font-family:var(--mono);color:var(--accent)">J1=5 · J2=4 · J3=36</span><br>
+          Active level: <span style="font-family:var(--mono);color:var(--text)">HIGH (INPUT_PULLUP)</span><br>
+          After ESTOP: press <span style="font-family:var(--mono);color:var(--green);">RE-ENABLE</span> before homing or motion.
+        </div>
+      </div>
+      <div class="card" style="background:var(--surface2);">
+        <div class="card-t" style="margin-bottom:8px;">Homing Status</div>
+        <div id="home-status" style="font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:2;">
+          Not started
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIG / PID TAB -->
+    <div class="tc-content" id="tab-pid">
+      <div class="card">
+        <div class="card-t">PID Reference (Firmware Constants)</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:11px;">
+          Edit gains in <code style="color:var(--accent);font-family:var(--mono)">IK_Control.ino</code> and re-upload.
+        </div>
+        <div class="pig">
+          <div class="pif"><label>Kp</label><input type="number" value="0.2" step="0.05" readonly></div>
+          <div class="pif"><label>Ki</label><input type="number" value="0.0" step="0.01" readonly></div>
+          <div class="pif"><label>Kd</label><input type="number" value="0.0" step="0.01" readonly></div>
+          <div class="pif"><label>kFF</label><input type="number" value="0.1" step="0.01" readonly></div>
+          <div class="pif"><label>kG2 (J2)</label><input type="number" value="0.15" step="0.01" readonly></div>
+          <div class="pif"><label>kG3 (J3)</label><input type="number" value="0.10" step="0.01" readonly></div>
+        </div>
+        <div class="pmeta">Deadband: 0.5° · Max Failures: 10 · CL Rate: 20Hz · S-Curve: smoothstep</div>
+      </div>
+
+      <div class="card" style="background:var(--surface2);">
+        <div class="card-t" style="margin-bottom:8px;">Axis Configuration</div>
+        <table class="act">
+          <thead><tr><th>Axis</th><th>Gear Ratio</th><th>Steps/°</th><th>Max Speed</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--accent)">J1 Base</td>
+              <td>
+                <input type="number" id="gear1-in" value="8.33" step="0.01" style="width:52px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:2px 4px;">
+                <button onclick="sendGear1()" style="font-size:9px;padding:2px 5px;margin-left:4px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">Set</button>
+              </td>
+              <td style="color:var(--text)">74.05</td>
+              <td style="color:var(--text)">20000</td>
+            </tr>
+            <tr>
+              <td style="color:var(--accent)">J2 Shldr</td>
+              <td>
+                <input type="number" id="gear2-in" value="20.0" step="0.01" style="width:52px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:3px;padding:2px 4px;">
+                <button onclick="sendGear2()" style="font-size:9px;padding:2px 5px;margin-left:4px;background:var(--accent);color:#fff;border:none;border-radius:3px;cursor:pointer;">Set</button>
+              </td>
+              <td style="color:var(--text)">177.78</td>
+              <td style="color:var(--text)">35000</td>
+            </tr>
+            <tr>
+              <td style="color:var(--accent)">J3 Elbow</td>
+              <td style="color:var(--text)">20:1</td>
+              <td style="color:var(--text)">177.78</td>
+              <td style="color:var(--text)">25000</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-ghost" style="flex:1;font-size:11px;" onclick="send('DIAG')">Driver Diag</button>
+          <button class="btn btn-primary" style="flex:1;font-size:11px;" onclick="send('SAVECFG')">Save Config</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /center -->
+
+  <!-- RIGHT PANEL: Terminal -->
+  <div class="right">
+    <div class="thdr">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+      <span>Wireless Terminal</span>
+      <button class="btn btn-ghost" style="padding:2px 8px;font-size:9px;" onclick="clearLog()">Clear</button>
+    </div>
+    <div id="term"></div>
+    <div class="tinput-row" style="position:relative;">
+      <input id="mi" type="text" placeholder="Command… (↑↓ history, Enter to send)"
+        onkeydown="handleKey(event)">
+      <button class="sbtn" onclick="sendManual()">SEND</button>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<!-- ─── FOOTER ─────────────────────────────────────── -->
+<footer>
+  <div class="footer-section">
+    <div class="footer-section-label">Speed Override</div>
+    <div class="footer-speed-row">
+      <input type="range" id="speed-sl" min="5" max="100" step="5" value="100" oninput="upSpeed()">
+      <span class="footer-speed-val" id="speed-val-disp">100%</span>
+    </div>
+  </div>
+  <div class="footer-divider"></div>
+  <div class="footer-spacer"></div>
+  <div class="footer-section" style="min-width:0; align-items: flex-end;">
+    <div class="footer-section-label">
+    </div>
+    <div class="footer-telem-row">
+      <div class="footer-tcell"><label>J1</label><div class="tv" id="tel-j1">-</div></div>
+      <div class="footer-tcell"><label>J2</label><div class="tv" id="tel-j2">-</div></div>
+      <div class="footer-tcell"><label>J3</label><div class="tv" id="tel-j3">-</div></div>
+      <div class="footer-tcell" style="border-color:var(--yellow);border-style:dashed;"><label style="color:var(--yellow)">J4</label><div class="tv" style="color:var(--yellow)" id="tel-j4">-</div></div>
+      <div class="footer-tcell" style="border-color:var(--yellow);border-style:dashed;"><label style="color:var(--yellow)">J5</label><div class="tv" style="color:var(--yellow)" id="tel-j5">-</div></div>
+    </div>
+  </div>
+</footer>
+
+<!-- ─── THREE.JS (inline-CDN, no local file needed for ESP32) ─── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="shared/kinematics.js"></script>
+
+<script>
+  // ═══════════════════════════════════════════════════
+  // WEBSOCKET STATE
+  // ═══════════════════════════════════════════════════
+  let ws = null;
+  let connected = false;
+  let connecting = false;
+  let autoReconnect = true;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+
+  const WS_PORT = 81; // default ESP32 WebSocket port (change if needed)
+
+  const DEFAULT_ESP32_IP = '192.168.4.1';
+  function getWsUrl() {
+    // FIX: poprzednia wersja zawsze nadpisywała pole "ws-ip" wartością location.hostname,
+    // gdy strona była serwowana przez HTTP (czyli praktycznie zawsze w normalnym użyciu –
+    // ESP32 serwuje ten plik sam ze swojego adresu). W efekcie pole do wpisania innego IP
+    // było martwym elementem UI. Teraz pole wejściowe ma priorytet, jeśli użytkownik
+    // faktycznie je zmienił; w przeciwnym razie korzystamy z hosta strony, a na końcu
+    // z domyślnego IP trybu AP.
+    const ipField = document.getElementById('ws-ip');
+    const manualHost = ipField ? ipField.value.trim() : '';
+    let host = (manualHost && manualHost !== DEFAULT_ESP32_IP) ? manualHost : null;
+    if (!host && location && location.hostname) host = location.hostname;
+    if (!host) host = manualHost || DEFAULT_ESP32_IP;
+    return `ws://${host}:${WS_PORT}`;
+  }
+
+  function setConnectionUI(nextConnected, nextConnecting = false) {
+    connected = nextConnected;
+    connecting = nextConnecting;
+    const conBtn = document.getElementById('con-btn');
+    const ipInput = document.getElementById('ws-ip');
+    const statusEl = document.getElementById('stext');
+    const dotEl = document.getElementById('dot');
+    if (!conBtn || !statusEl || !dotEl) return;
+
+    conBtn.disabled = nextConnecting;
+    conBtn.textContent = nextConnecting ? 'Connecting…' : nextConnected ? 'Disconnect' : 'Connect';
+    conBtn.className = nextConnected ? 'btn btn-danger' : 'btn btn-primary';
+    if (ipInput) ipInput.disabled = nextConnecting || nextConnected;
+
+    statusEl.textContent = nextConnecting ? 'Connecting…' : nextConnected ? 'Connected (WiFi)' : 'Disconnected';
+    dotEl.classList.toggle('on', nextConnected && !estopActive);
+    dotEl.classList.toggle('homing', false);
+    dotEl.style.background = nextConnected ? 'var(--green)' : '';
+  }
+
+  function toggleConnect() {
+    if (connecting) return;
+    if (connected) {
+      autoReconnect = false;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      safeCloseSocket();
+      hideReconnectOverlay();
+      setConnectionUI(false, false);
+    } else {
+      autoReconnect = true;
+      reconnectAttempt = 0;
+      startConnect();
+    }
+  }
+
+  function safeCloseSocket() {
+    if (!ws) return;
+    try {
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+    } catch (e) {
+      // Ignore close errors; the reconnect path will recover gracefully.
+    } finally {
+      ws = null;
+    }
+  }
+
+  function startConnect() {
+    if (connecting) return;
+    safeCloseSocket();
+    setConnectionUI(false, true);
+    const url = getWsUrl();
+    log(`Connecting to ${url}…`, 'i');
+    try {
+      ws = new WebSocket(url);
+    } catch(e) {
+      log(`WS Error: ${e.message}`, 'e');
+      scheduleReconnect();
+      return;
+    }
+
+    ws.onopen = () => {
+      reconnectAttempt = 0;
+      hideReconnectOverlay();
+      setConnectionUI(true, false);
+      document.getElementById('estop-btn').style.display = '';
+      log(`WebSocket connected → ${getWsUrl()}`, 'i');
+      setTimeout(() => runDiag(), 1200);
+    };
+
+    ws.onclose = () => {
+      const wasConnected = connected;
+      setConnectionUI(false, false);
+      document.getElementById('dot').classList.remove('on', 'homing');
+      document.getElementById('estop-btn').style.display = 'none';
+      document.getElementById('reenable-btn').style.display = 'none';
+      setEstopUI(false);
+      if (wasConnected) log('Connection lost', 'e');
+      if (autoReconnect) scheduleReconnect();
+    };
+
+    ws.onerror = () => {
+      if (!connected) log('Connection failed', 'e');
+      setConnectionUI(false, false);
+    };
+
+    ws.onmessage = (evt) => handleLine(evt.data.trim());
+  }
+
+  function scheduleReconnect() {
+    reconnectAttempt++;
+    const delay = Math.min(1000 * reconnectAttempt, 8000);
+    showReconnectOverlay(reconnectAttempt, delay);
+    reconnectTimer = setTimeout(() => {
+      if (autoReconnect) startConnect();
+    }, delay);
+  }
+
+  function cancelReconnect() {
+    autoReconnect = false;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    hideReconnectOverlay();
+  }
+
+  function showReconnectOverlay(attempt, ms) {
+    const el = document.getElementById('reconnect-overlay');
+    document.getElementById('reconnect-msg').textContent =
+      `Reconnecting to ESP32… (attempt ${attempt}, retry in ${(ms/1000).toFixed(0)}s)`;
+    el.classList.add('show');
+  }
+  function hideReconnectOverlay() {
+    document.getElementById('reconnect-overlay').classList.remove('show');
+  }
+
+  // ─── ESTOP ───────────────────────────────────────
+  let estopActive = false;
+  function setEstopUI(active) {
+    estopActive = active;
+    const estopBtn = document.getElementById('estop-btn');
+    const reenableBtn = document.getElementById('reenable-btn');
+    const status = document.getElementById('stext');
+    const dot = document.getElementById('dot');
+    const homeButtons = document.querySelectorAll('.home-grid .hbtn');
+    if (active) {
+      estopBtn.style.display = 'none';
+      reenableBtn.style.display = '';
+      status.textContent = 'ESTOP active';
+      dot.classList.remove('on','homing');
+      dot.style.background = 'var(--red)';
+      homeButtons.forEach(b => b.disabled = true);
+    } else {
+      estopBtn.style.display = connected ? '' : 'none';
+      reenableBtn.style.display = 'none';
+      status.textContent = connected ? 'Connected (WiFi)' : 'Disconnected';
+      dot.style.background = '';
+      if (connected) dot.classList.add('on');
+      homeButtons.forEach(b => b.disabled = false);
+    }
+  }
+
+  async function doEstop() {
+    setEstopUI(true);
+    if (typeof stopSeq === 'function') stopSeq();
+    send('ESTOP');
+  }
+
+  async function doReenable() {
+    if (!connected) {
+      log('ERR: Cannot re-enable while disconnected', 'e');
+      return;
+    }
+    send('REENABLE');
+    setEstopUI(false);
+    log('REENABLE sent', 'i');
+  }
+
+  // ─── WASD Jogging Support ──────────────────────────
+  const WASD_KEYS = { 'w': 'y1', 's': 'y-1', 'a': 'x-1', 'd': 'x1', 'q': 'z1', 'e': 'z-1' };
+  function isJoggingInput(el) {
+    if (!el) return false;
+    const tag = el.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { doEstop(); return; }
+    // WASD jogging - only when not typing in inputs
+    if (isJoggingInput(document.activeElement)) return;
+    const key = e.key.toLowerCase();
+    if (key in WASD_KEYS) {
+      e.preventDefault();
+      const val = WASD_KEYS[key];
+      const axis = val[0];
+      const sign = parseInt(val.substring(1), 10);
+      stepJog(axis, sign);
+    }
+  });
+
+  // ─── SEND ────────────────────────────────────────
+  function send(cmd) {
+    const value = String(cmd || '').trim();
+    if (!value) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) { log('ERR: Not connected', 'e'); return; }
+    ws.send(value + '\n');
+    log(`>> ${value}`, 's');
+  }
+
+  // ─── LINE HANDLER ────────────────────────────────
+  function handleLine(line) {
+    if (!line) return;
+    if (line.startsWith('{')) {
+      parseJsonPos(line);
+      log(line, 'p');
+      return;
+    }
+    if (/^A-?[\d.]+B/.test(line)) {
+      parseAR4Pos(line);
+      log(line, 'p');
+      return;
+    }
+    if (line.startsWith('EC')) {
+      handleCollision(line);
+      log(line, 'e');
+      return;
+    }
+    if (line.startsWith('HOMING')) {
+      updateHomingStatus(line);
+      log(line, 'h');
+      return;
+    }
+    if (line.startsWith('ESTOP') || line.includes('EMERGENCY STOP')) {
+      setEstopUI(true);
+      log(line, 'e');
+      return;
+    }
+    if (line.startsWith('IK Solution:')) {
+      parseIKSolution(line);
+    }
+    if (line.startsWith('SD_FILES:')) {
+      updateSDList(line.substring(9));
+      return;
+    }
+    const cls = line.startsWith('ERR') || line.includes('[ERR]') ? 'e'
+              : line.startsWith('WARN') || line.includes('[WARN]') ? 'w'
+              : line === 'OK' ? 'i'
+              : 'r';
+    log(line, cls);
+    parseDiagLine(line);
+  }
+
+  // ─── JSON Position Parser ────────────────────────
+  function parseJsonPos(line) {
+    try {
+      const data = JSON.parse(line);
+      if (data.j1 !== undefined) { lastPos.j1=data.j1; document.getElementById('tel-j1').textContent = data.j1.toFixed(1)+'°'; }
+      if (data.j2 !== undefined) { lastPos.j2=data.j2; document.getElementById('tel-j2').textContent = data.j2.toFixed(1)+'°'; }
+      if (data.j3 !== undefined) { lastPos.j3=data.j3; document.getElementById('tel-j3').textContent = data.j3.toFixed(1)+'°'; }
+      if (data.j4 !== undefined) { lastPos.j4=data.j4; document.getElementById('tel-j4').textContent = data.j4.toFixed(0)+'°'; }
+      if (data.j5 !== undefined) { lastPos.j5=data.j5; document.getElementById('tel-j5').textContent = data.j5.toFixed(0)+'°'; }
+      if (data.x  !== undefined) { lastPos.x=data.x;  document.getElementById('tel-x').textContent = data.x.toFixed(1); }
+      if (data.y  !== undefined) { lastPos.y=data.y;  document.getElementById('tel-y').textContent = data.y.toFixed(1); }
+      if (data.z  !== undefined) { lastPos.z=data.z;  document.getElementById('tel-z').textContent = data.z.toFixed(1); }
+      if (data.spd !== undefined && Number.isFinite(data.spd)) currentSpeed = data.spd;
+      if (data.state) updateRobotStatePill(data.state);
+      if (data.fw) {
+        const fwEl = document.getElementById('fw-ver');
+        if (fwEl) fwEl.textContent = data.fw;
+      }
+
+      document.getElementById('fk-bar').style.display = 'flex';
+      if (data.j1 !== undefined) document.getElementById('fk-j1').textContent = data.j1.toFixed(2);
+      if (data.j2 !== undefined) document.getElementById('fk-j2').textContent = data.j2.toFixed(2);
+      if (data.j3 !== undefined) document.getElementById('fk-j3').textContent = data.j3.toFixed(2);
+      if (data.j4 !== undefined) document.getElementById('fk-j4').textContent = data.j4.toFixed(0);
+      if (data.j5 !== undefined) document.getElementById('fk-j5').textContent = data.j5.toFixed(0);
+      syncSlider('j1', data.j1); syncSlider('j2', data.j2); syncSlider('j3', data.j3);
+      syncSlider('j4', data.j4); syncSlider('j5', data.j5);
+      updateMotionEstimate();
+      if (typeof update3DTarget !== 'undefined') update3DTarget();
+    } catch(e) {
+      log('ERR parsing JSON telemetry: ' + e.message, 'e');
+    }
+  }
+
+  // ─── AR4 Position Parser ─────────────────────────
+  let lastPos = { j1:0, j2:0, j3:0, j4:90, j5:90, w:0, x:0, y:0, z:0 };
+
+  function parseAR4Pos(line) {
+    const get = (key, nextKey) => {
+      const re = new RegExp(key + '(-?[\\d.]+)' + (nextKey ? '(?=' + nextKey + ')' : '$'));
+      const m = line.match(re);
+      return m ? parseFloat(m[1]) : null;
+    };
+    const j1 = get('A','B'), j2 = get('B','C'), j3 = get('C','D');
+    const j4 = get('D','E'), j5 = get('E','F');
+    const x  = get('G','H'), y  = get('H','I'), z  = get('I', null);
+
+    if (j1 !== null) { lastPos.j1=j1; document.getElementById('tel-j1').textContent = j1.toFixed(1)+'°'; }
+    if (j2 !== null) { lastPos.j2=j2; document.getElementById('tel-j2').textContent = j2.toFixed(1)+'°'; }
+    if (j3 !== null) { lastPos.j3=j3; document.getElementById('tel-j3').textContent = j3.toFixed(1)+'°'; }
+    if (j4 !== null) { lastPos.j4=j4; document.getElementById('tel-j4').textContent = j4.toFixed(0)+'°'; }
+    if (j5 !== null) { lastPos.j5=j5; document.getElementById('tel-j5').textContent = j5.toFixed(0)+'°'; }
+    if (x  !== null) { lastPos.x=x;  document.getElementById('tel-x').textContent = x.toFixed(1); }
+    if (y  !== null) { lastPos.y=y;  document.getElementById('tel-y').textContent = y.toFixed(1); }
+    if (z  !== null) { lastPos.z=z;  document.getElementById('tel-z').textContent = z.toFixed(1); }
+
+    document.getElementById('fk-bar').style.display = 'flex';
+    if (j1 !== null) document.getElementById('fk-j1').textContent = j1.toFixed(2);
+    if (j2 !== null) document.getElementById('fk-j2').textContent = j2.toFixed(2);
+    if (j3 !== null) document.getElementById('fk-j3').textContent = j3.toFixed(2);
+    if (j4 !== null) document.getElementById('fk-j4').textContent = j4.toFixed(0);
+    if (j5 !== null) document.getElementById('fk-j5').textContent = j5.toFixed(0);
+    syncSlider('j1', j1); syncSlider('j2', j2); syncSlider('j3', j3);
+    syncSlider('j4', j4); syncSlider('j5', j5);
+    updateMotionEstimate();
+    if (typeof update3DTarget !== 'undefined') update3DTarget();
+  }
+
+  function parseIKSolution(line) {
+    const errMatch = line.match(/FK error=([\d.]+)mm/);
+    if (errMatch) {
+      const err = parseFloat(errMatch[1]);
+      const el = document.getElementById('fk-err');
+      el.textContent = err.toFixed(2);
+      el.className = err < 2.0 ? 'fk-err-ok' : 'fk-err-bad';
+    }
+  }
+
+  // ─── Collision ───────────────────────────────────
+  let collisionTimeout = null;
+  function handleCollision(line) {
+    const banner = document.getElementById('collision-banner');
+    banner.style.display = 'block';
+    banner.textContent = `COLLISION DETECTED: ${line} - Check joints before resuming`;
+    clearTimeout(collisionTimeout);
+    collisionTimeout = setTimeout(() => { banner.style.display = 'none'; }, 8000);
+  }
+
+  // ─── Homing Status ───────────────────────────────
+  function updateHomingStatus(line) {
+    const el = document.getElementById('home-status');
+    const p = document.createElement('div');
+    const ts = new Date().toLocaleTimeString('en-GB',{hour12:false});
+    p.textContent = `[${ts}] ${line}`;
+    p.style.color = line.includes('OK') ? 'var(--green)'
+                  : line.includes('WARN') ? 'var(--yellow)'
+                  : 'var(--orange)';
+    el.appendChild(p);
+    el.scrollTop = el.scrollHeight;
+
+    if (line.includes('HOMING: Starting')) {
+      el.innerHTML = '';
+      document.getElementById('dot').classList.add('homing');
+    }
+    if (line === 'OK' || line.includes('HOME_FAULT') || line.includes('HOMING: Incomplete')) {
+      document.getElementById('dot').classList.remove('homing');
+      if (connected && !estopActive) document.getElementById('dot').classList.add('on');
+    }
+  }
+
+  // ─── SD list ─────────────────────────────────────
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  // FIX: poprzednio ta funkcja ORAZ renderSDList() (niżej w pliku) renderowały się
+  // do tego samego kontenera #sd-list, niezależnie nadpisując nawzajem swój stan
+  // (lista realnych plików z karty SD vs. lokalny cache nazw/pozycji w pamięci JS).
+  // Teraz updateSDList() jedynie aktualizuje listę nazw znanych z urządzenia
+  // wewnątrz wspólnego źródła prawdy (savedPositions), zachowując dane o kątach,
+  // jeśli już je znamy z lokalnego zapisu, i deleguje rysowanie do renderSDList().
+  function updateSDList(files) {
+    const deviceNames = String(files || '').split(',').map(f => f.trim()).filter(Boolean);
+    const byName = new Map(savedPositions.map(p => [p.name, p]));
+    savedPositions = deviceNames.map(name => byName.get(name) || { name });
+    renderSDList();
+  }
+
+  // ─── DIAG ────────────────────────────────────────
+  let diagOpen = false;
+  function toggleDiag() { diagOpen ? closeDiag() : openDiag(); }
+  function openDiag()  { document.getElementById('diag-pop').classList.add('open'); diagOpen=true; }
+  function closeDiag() { document.getElementById('diag-pop').classList.remove('open'); diagOpen=false; }
+  document.addEventListener('click', e => {
+    if (diagOpen && !document.getElementById('diag-pop').contains(e.target)
+        && !document.getElementById('diag-btn').contains(e.target)) closeDiag();
+  });
+
+  function runDiag() {
+    ['db1','db2','db3'].forEach(id => {
+      const b=document.getElementById(id);
+      b.className='db'; b.querySelector('.ds').textContent='…';
+    });
+    updateDiagBtn('');
+    send('DIAG');
+  }
+
+  function updateDiagBtn(state) {
+    const btn = document.getElementById('diag-btn');
+    const dot = document.getElementById('diag-dot');
+    btn.className = 'diag-btn' + (state ? ' '+state : '');
+    const colors = {ok:'var(--green)',warn:'var(--yellow)',fail:'var(--red)'};
+    dot.style.background = colors[state] || 'var(--text-dim)';
+    dot.style.boxShadow = colors[state] ? `0 0 5px ${colors[state]}` : 'none';
+  }
+
+  const DIAG_MAP = {'Axis 1':'db1','Axis 2':'db2','Axis 3':'db3'};
+  let activeDiagBadge = null;
+  function parseDiagLine(line) {
+    for (const [k,id] of Object.entries(DIAG_MAP)) {
+      if (line.includes('---') && line.includes(k)) { activeDiagBadge=id; return; }
+    }
+    if (!activeDiagBadge) return;
+    const b = document.getElementById(activeDiagBadge);
+    if (line.includes('Connection: OK')) {
+      b.className='db ok'; b.querySelector('.ds').textContent='OK';
+      activeDiagBadge=null; refreshDiagSum();
+    } else if (line.includes('FAIL')) {
+      b.className='db fail'; b.querySelector('.ds').textContent='FAIL';
+      activeDiagBadge=null; refreshDiagSum();
+    } else if ((line.includes('[WARN]')||line.includes('[ERR]')) && !b.classList.contains('fail')) {
+      b.className='db warn'; b.querySelector('.ds').textContent=line.includes('[ERR]')?'ERR':'WARN';
+      refreshDiagSum();
+    }
+  }
+  function refreshDiagSum() {
+    const fail=!!document.querySelector('.db.fail');
+    const warn=!!document.querySelector('.db.warn');
+    const allOk=document.querySelectorAll('.db.ok').length===3;
+    updateDiagBtn(fail?'fail':warn?'warn':allOk?'ok':'');
+  }
+
+  // ─── Telemetry ───────────────────────────────────
+  let telemActive = false;
+  function togTelem() {
+    telemActive = !telemActive;
+    const btn = document.getElementById('telem-btn');
+    if (telemActive) {
+      btn.textContent='TELEM ON'; btn.className='atog jok';
+      send('TELEM 1');
+    } else {
+      btn.textContent='TELEM OFF'; btn.className='atog eok';
+      send('TELEM 0');
+    }
+  }
+
+  // ─── Joint toggles ───────────────────────────────
+  const jntSt=[true,true,true,true,true], encSt=[true,true,true];
+  function togJnt(n) {
+    jntSt[n-1]=!jntSt[n-1];
+    const btn=document.getElementById(`t-jnt${n}`);
+    btn.className='atog '+(jntSt[n-1]?'jok':'off');
+    if (n <= 3) send(`JNT${n} ${jntSt[n-1]?1:0}`);
+    const sl = document.getElementById(`j${n}`);
+    if (sl) sl.disabled = !jntSt[n-1];
+  }
+  function togEnc(n) {
+    if (n > 3) return;
+    encSt[n-1]=!encSt[n-1];
+    const btn=document.getElementById(`t-enc${n}`);
+    btn.className='atog '+(encSt[n-1]?'eok':'off');
+    send(`ENC${n} ${encSt[n-1]?1:0}`);
+  }
+
+  function syncSlider(id, val) {
+    if (val === null) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    const clamped = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), val));
+    el.value = clamped;
+    upSlider(id);
+  }
+
+  // ─── Sliders ─────────────────────────────────────
+  let currentSpeed = 100;
+  const SLIDER_MOVE_MS = 600;
+  const MOTION = {
+    STEPS_PER_REV: 200,
+    MICROSTEPS: 16,
+    GEAR1_DEFAULT: 8.33,
+    GEAR23_DEFAULT: 20.0,
+    MAX_STEPS_J1: 40000,
+    MAX_STEPS_J2: 80000,
+    MAX_STEPS_J3: 60000,
+    SAFETY_SCALE: 1.5
+  };
+  let _coordMode = 'cart', _jogDelta = 5;
+  let _sliderSettleTimer = null;
+  function upSlider(id) {
+    const el=document.getElementById(id);
+    if (!el) return;
+    const v=el.value, mn=parseFloat(el.min), mx=parseFloat(el.max);
+    const pct=((v-mn)/(mx-mn))*100;
+    el.style.background=`linear-gradient(to right,var(--accent) 0%,var(--accent) ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+    const valDisp = document.getElementById(id+'-v');
+    if (valDisp) {
+      const degSuffix = id==='cyl-t'||id==='ik-j4'||id==='ik-j5'||id==='j4'||id==='j5'||id==='j1'||id==='j2'||id==='j3';
+      valDisp.textContent=v+(degSuffix?'°':'mm');
+    }
+    // Sync number input ↔ range slider for IK X/Y/Z
+    const numEl = document.getElementById(id+'-num');
+    if (numEl && id.match(/^ik-[xyz]$/)) {
+      numEl.value = v;
+    }
+    if (id==='ik-x'||id==='ik-y'||id==='ik-z') {
+      const x=parseFloat(document.getElementById('ik-x').value);
+      const y=parseFloat(document.getElementById('ik-y').value);
+      const z=parseFloat(document.getElementById('ik-z').value);
+      if (!Number.isNaN(x) && !Number.isNaN(y) && !Number.isNaN(z)) {
+        const r=Math.round(Math.sqrt(x*x+y*y));
+        const theta=Math.round((Math.atan2(y,x)*180/Math.PI)*10)/10;
+        const cylR=document.getElementById('cyl-r');
+        const cylT=document.getElementById('cyl-t');
+        const cylZ=document.getElementById('cyl-z');
+        if (cylR) { cylR.value=r; upSlider('cyl-r'); }
+        if (cylT) { cylT.value=theta; upSlider('cyl-t'); }
+        if (cylZ) { cylZ.value=z; upSlider('cyl-z'); }
+        const cylRv=document.getElementById('cyl-r-v');
+        const cylTv=document.getElementById('cyl-t-v');
+        const cylZv=document.getElementById('cyl-z-v');
+        if (cylRv) cylRv.textContent=r+'mm';
+        if (cylTv) cylTv.textContent=theta+'°';
+        if (cylZv) cylZv.textContent=z+'mm';
+      }
+    }
+    if (typeof update3DTarget !== 'undefined') update3DTarget();
+  }
+  function upDur() {
+    document.getElementById('ik-dur-v').textContent = document.getElementById('ik-dur').value + 'ms';
+    updateMotionEstimate();
+  }
+  function upSpeed() {
+    currentSpeed=parseInt(document.getElementById('speed-sl').value, 10);
+    document.getElementById('speed-val-disp').textContent=currentSpeed+'%';
+    document.getElementById('hdr-speed').textContent=currentSpeed+'%';
+    const el=document.getElementById('speed-sl');
+    const pct=((currentSpeed-5)/95)*100;
+    el.style.background=`linear-gradient(to right,var(--cyan) 0%,var(--cyan) ${pct}%,var(--border) ${pct}%,var(--border) 100%)`;
+    updateMotionEstimate();
+  }
+  function sendSpeed() { send(`SPEED ${currentSpeed}`); }
+
+  function sendAx(cmd, sid) {
+    const v=document.getElementById(sid).value;
+    send(`${cmd} ${v}`);
+  }
+
+  function sendAll() {
+    const vals=[
+      document.getElementById('j1').value,
+      document.getElementById('j2').value,
+      document.getElementById('j3').value,
+      document.getElementById('j4').value,
+      document.getElementById('j5').value,
+      0, 0,
+      document.getElementById('ik-dur').value
+    ];
+    const p=vals.join(',');
+    let crc=0; for(let i=0;i<p.length;i++) crc^=p.charCodeAt(i);
+    send(`<${p},${crc}>`);
+  }
+
+  // ─── IK ──────────────────────────────────────────
+  let ikCheckDebounce = null;
+  function buildMovCommand(x, y, z, wristMode, j4Manual, j5, duration, j6 = 0) {
+    const isMovL = document.getElementById('ik-movl') && document.getElementById('ik-movl').checked;
+    const baseCmd = isMovL ? "MOVL" : "MOV";
+    const parts = [`${baseCmd} X${x}`,`Y${y}`,`Z${z}`,`W${wristMode}`,`J4${j4Manual}`,`J5${j5}`,`J6${j6}`];
+    if (duration !== '' && duration !== null && duration !== undefined) parts.push(`D${duration}`);
+    return parts.join(' ');
+  }
+
+  function mapIkUiToFirmware(xUi, yUi, zUi) { return { x:xUi, y:yUi, z:zUi }; }
+
+  function getRequestedDurationMs() {
+    const v = parseInt(document.getElementById('ik-dur').value, 10);
+    return Number.isFinite(v) && v > 0 ? v : SLIDER_MOVE_MS;
+  }
+
+  function getStepsPerDeg() {
+    const motorSteps = MOTION.STEPS_PER_REV * MOTION.MICROSTEPS;
+    const gear1 = parseFloat(document.getElementById('gear1-in')?.value) || MOTION.GEAR1_DEFAULT;
+    const gear23 = parseFloat(document.getElementById('gear2-in')?.value) || MOTION.GEAR23_DEFAULT;
+    return { j1:(motorSteps * gear1) / 360, j23:(motorSteps * gear23) / 360 };
+  }
+
+  function estimateJointMoveMs(fromJ, toJ, requestedMs) {
+    const spd = getStepsPerDeg();
+    const d1 = Math.abs(toJ.j1 - fromJ.j1) * spd.j1;
+    const d2 = Math.abs(toJ.j2 - fromJ.j2) * spd.j23;
+    const d3 = Math.abs(toJ.j3 - fromJ.j3) * spd.j23;
+    const minMs = Math.max(
+      (d1 / MOTION.MAX_STEPS_J1) * MOTION.SAFETY_SCALE * 1000,
+      (d2 / MOTION.MAX_STEPS_J2) * MOTION.SAFETY_SCALE * 1000,
+      (d3 / MOTION.MAX_STEPS_J3) * MOTION.SAFETY_SCALE * 1000
+    );
+    return Math.max(requestedMs, minMs) / Math.max(0.05, currentSpeed / 100);
+  }
+
+  function formatDuration(ms) {
+    if (!Number.isFinite(ms)) return '--';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    return `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`;
+  }
+
+  function clearMotionEstimate() {
+    ['move-time','move-eta','move-dist','move-speed'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '--';
+    });
+  }
+
+  function updateMotionEstimate(target = null) {
+    const j1 = target?.j1 ?? parseFloat(document.getElementById('fk-j1')?.textContent);
+    const j2 = target?.j2 ?? parseFloat(document.getElementById('fk-j2')?.textContent);
+    const j3 = target?.j3 ?? parseFloat(document.getElementById('fk-j3')?.textContent);
+    if ([j1,j2,j3,lastPos.j1,lastPos.j2,lastPos.j3].some(v => !Number.isFinite(v))) {
+      clearMotionEstimate();
+      return;
+    }
+
+    const requestedMs = getRequestedDurationMs();
+    const moveMs = estimateJointMoveMs(lastPos, {j1,j2,j3}, requestedMs);
+    const x = parseFloat(document.getElementById('ik-x').value);
+    const y = parseFloat(document.getElementById('ik-y').value);
+    const z = parseFloat(document.getElementById('ik-z').value);
+    const dx = x - lastPos.x, dy = y - lastPos.y, dz = z - lastPos.z;
+    const tcpDist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    const avgSpeed = Number.isFinite(tcpDist) && moveMs > 0 ? tcpDist / (moveMs / 1000) : NaN;
+
+    document.getElementById('move-time').textContent = formatDuration(moveMs);
+    document.getElementById('move-eta').textContent = new Date(Date.now() + moveMs).toLocaleTimeString('en-GB', {hour12:false});
+    document.getElementById('move-dist').textContent = Number.isFinite(tcpDist) ? `${tcpDist.toFixed(1)}mm` : '--';
+    document.getElementById('move-speed').textContent = Number.isFinite(avgSpeed) ? `${avgSpeed.toFixed(1)}mm/s` : '--';
+  }
+
+  function ikWorkspaceCheck(showSuggestion = true) {
+    const xUi = parseFloat(document.getElementById('ik-x').value);
+    const yUi = parseFloat(document.getElementById('ik-y').value);
+    const zUi = parseFloat(document.getElementById('ik-z').value);
+    const w = parseInt(document.getElementById('ik-wrist').value, 10);
+    const j4m = parseFloat(document.getElementById('ik-j4').value);
+    const j5m = parseFloat(document.getElementById('ik-j5').value);
+    const btn = document.getElementById('ik-send-btn');
+    const status = document.getElementById('ik-ws-status');
+    const joggingStatus = document.getElementById('jogging-ws-status');
+    const fields = ['ik-x', 'ik-y', 'ik-z'].map(id => document.getElementById(id));
+
+    const badInput = Number.isNaN(xUi) || Number.isNaN(yUi) || Number.isNaN(zUi) || Number.isNaN(j4m) || Number.isNaN(j5m);
+    if (badInput) {
+      clearMotionEstimate();
+      fields.forEach(el => el.classList.add('ik-invalid'));
+      status.className = 'ik-ws-status ik-ws-bad';
+      if (joggingStatus) joggingStatus.className = 'ik-ws-status ik-ws-bad';
+      status.textContent = 'Workspace check: invalid numeric input';
+      if (joggingStatus) joggingStatus.textContent = status.textContent;
+      btn.disabled = true;
+      return false;
+    }
+
+    const mapped = mapIkUiToFirmware(xUi, yUi, zUi);
+    const sol = RobotKinematics.solveIK(
+      mapped.x, mapped.y, mapped.z, w, j4m, j5m,
+      lastPos.j2 || 0, lastPos.j3 || 0, lastPos.j1 || 0
+    );
+    const ok = sol.ok;
+    fields.forEach(el => el.classList.toggle('ik-invalid', !ok));
+    status.className = `ik-ws-status ${ok ? 'ik-ws-ok' : 'ik-ws-bad'}`;
+
+    if (ok) {
+      status.textContent = `Workspace check: OK (FK err ${sol.err.toFixed(2)}mm)`;
+      if (joggingStatus) {
+        joggingStatus.className = 'ik-ws-status ik-ws-ok';
+        joggingStatus.textContent = status.textContent;
+      }
+      lastPos.x = xUi; lastPos.y = yUi; lastPos.z = zUi; lastPos.w = w;
+      lastPos.j1 = sol.j1; lastPos.j2 = sol.j2; lastPos.j3 = sol.j3;
+      lastPos.j4 = sol.j4; lastPos.j5 = sol.j5;
+      document.getElementById('fk-j1').textContent = sol.j1.toFixed(2);
+      document.getElementById('fk-j2').textContent = sol.j2.toFixed(2);
+      document.getElementById('fk-j3').textContent = sol.j3.toFixed(2);
+      document.getElementById('fk-j4').textContent = sol.j4.toFixed(0);
+      document.getElementById('fk-j5').textContent = sol.j5.toFixed(0);
+      const fkErr = document.getElementById('fk-err');
+      if (fkErr) fkErr.textContent = sol.err.toFixed(2);
+      updateMotionEstimate({ j1: sol.j1, j2: sol.j2, j3: sol.j3 });
+    } else {
+      clearMotionEstimate();
+      const suggest = document.getElementById('ik-autosnap');
+      if (showSuggestion && suggest && suggest.checked) {
+        const p = findSuggestedIKTarget(25);
+        status.textContent = p
+          ? `Workspace check: OUT OF RANGE. Suggestion X${p.x} Y${p.y} Z${p.z}`
+          : 'Workspace check: OUT OF RANGE. No nearby valid point';
+      } else {
+        status.textContent = 'Workspace check: OUT OF RANGE (blocked)';
+      }
+      if (joggingStatus) joggingStatus.textContent = status.textContent;
+    }
+    btn.disabled = !ok;
+    return ok;
+  }
+
+  function sendCartesianJog(axis, mm) {
+    send(`${axis} ${mm}`);
+  }
+
+  function updateRobotStatePill(state) {
+    const el = document.getElementById('robot-state');
+    if (!el) return;
+    el.textContent = state || 'OFFLINE';
+    const pill = document.getElementById('robot-state-pill');
+    if (!pill) return;
+    const colors = {
+      IDLE: 'var(--green)', MOVING: 'var(--cyan)', STREAM: 'var(--cyan)',
+      HOMING: 'var(--yellow)', TEACH_PLAY: 'var(--accent)', TEACH_REC: 'var(--accent-2)',
+      ESTOP: 'var(--red)', FAULT: 'var(--red)', OFFLINE: 'var(--text-dim)'
+    };
+    pill.style.color = colors[state] || 'var(--text-mid)';
+  }
+
+  function findSuggestedIKTarget(maxRadius=20) {
+    const xEl=document.getElementById('ik-x'), yEl=document.getElementById('ik-y'), zEl=document.getElementById('ik-z');
+    const ox=parseFloat(xEl.value), oy=parseFloat(yEl.value), oz=parseFloat(zEl.value);
+    if(Number.isNaN(ox)||Number.isNaN(oy)||Number.isNaN(oz)) return null;
+    for(let r=1;r<=maxRadius;r++){
+      for(let dx=-r;dx<=r;dx++) for(let dy=-r;dy<=r;dy++) for(let dz=-r;dz<=r;dz++){
+        if(Math.max(Math.abs(dx),Math.abs(dy),Math.abs(dz))!==r) continue;
+        const tx=(ox+dx).toFixed(1), ty=(oy+dy).toFixed(1), tz=(oz+dz).toFixed(1);
+        xEl.value=tx; yEl.value=ty; zEl.value=tz;
+        if(ikWorkspaceCheck(false)){
+          xEl.value=ox.toFixed(1); yEl.value=oy.toFixed(1); zEl.value=oz.toFixed(1);
+          ikWorkspaceCheck(false); return {x:tx,y:ty,z:tz};
+        }
+      }
+    }
+    xEl.value=ox.toFixed(1); yEl.value=oy.toFixed(1); zEl.value=oz.toFixed(1);
+    ikWorkspaceCheck(false); return null;
+  }
+
+  function updateWristModeUI() {
+    const mode=parseInt(document.getElementById('ik-wrist').value, 10);
+    const j4Input=document.getElementById('ik-j4'), j5Input=document.getElementById('ik-j5');
+    const isManual=mode===6, isFixedJ5=(mode===0||mode===1);
+    j4Input.disabled=!isManual; j4Input.style.opacity=isManual?'1':'0.6';
+    j5Input.disabled=isFixedJ5; j5Input.style.opacity=isFixedJ5?'0.6':'1';
+    if(isFixedJ5) j5Input.value='90';
+    scheduleIkWorkspaceCheck();
+  }
+
+  function scheduleIkWorkspaceCheck() {
+    if(ikCheckDebounce) clearTimeout(ikCheckDebounce);
+    ikCheckDebounce=setTimeout(()=>{
+      ikWorkspaceCheck(false);
+      if(typeof update3DTarget!=='undefined') update3DTarget();
+    }, 220);
+  }
+
+  function clampIkInputValue(id) {
+    const el=document.getElementById(id); if(!el) return;
+    const v=parseFloat(el.value), mn=parseFloat(el.min), mx=parseFloat(el.max);
+    if(Number.isNaN(v)||Number.isNaN(mn)||Number.isNaN(mx)) return;
+    if(v<mn) el.value=mn; if(v>mx) el.value=mx;
+  }
+
+  function ikGoHome() {
+    document.getElementById('ik-x').value=0; document.getElementById('ik-y').value=0;
+    document.getElementById('ik-z').value=215; document.getElementById('ik-wrist').value=0;
+    document.getElementById('ik-j4').value=0; document.getElementById('ik-j5').value=0; if(document.getElementById('ik-j6')) document.getElementById('ik-j6').value=0;
+    updateWristModeUI(); ikWorkspaceCheck(false);
+    const dur=document.getElementById('ik-dur').value||'1000';
+    log('Returning to IK Home Position...','i');
+    send(buildMovCommand(0,0,215,'0','0','0',dur,'0'));
+  }
+
+  function sendIK(overrideDur = null) {
+    if(!ikWorkspaceCheck()){
+      const suggest=document.getElementById('ik-autosnap');
+      if(suggest&&suggest.checked){ const p=findSuggestedIKTarget(25); if(p) log(`Suggestion: set X${p.x} Y${p.y} Z${p.z}`,'w'); }
+      log('ERR: Target outside workspace (IK blocked in UI)','e'); return;
+    }
+    const xUi=parseFloat(document.getElementById('ik-x').value);
+    const yUi=parseFloat(document.getElementById('ik-y').value);
+    const zUi=parseFloat(document.getElementById('ik-z').value);
+    const mapped=mapIkUiToFirmware(xUi,yUi,zUi);
+    send(buildMovCommand(mapped.x,mapped.y,mapped.z,
+      document.getElementById('ik-wrist').value,
+      document.getElementById('ik-j4').value,
+      document.getElementById('ik-j5').value,
+      overrideDur != null ? overrideDur : document.getElementById('ik-dur').value,
+      document.getElementById('ik-j6')?.value || 0));
+  }
+
+  function sendQuiet(cmd) {
+    const value = String(cmd || '').trim();
+    if (!value) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(value + '\n');
+  }
+
+  function sendIKQuiet(dur) {
+    if (!ikWorkspaceCheck(false)) return;
+    const xUi = parseFloat(document.getElementById('ik-x').value);
+    const yUi = parseFloat(document.getElementById('ik-y').value);
+    const zUi = parseFloat(document.getElementById('ik-z').value);
+    const mapped = mapIkUiToFirmware(xUi, yUi, zUi);
+    sendQuiet(buildMovCommand(mapped.x, mapped.y, mapped.z,
+      document.getElementById('ik-wrist').value,
+      document.getElementById('ik-j4').value,
+      document.getElementById('ik-j5').value,
+      dur));
+  }
+
+  function settleSliderMove() {
+    if (_sliderSettleTimer) clearTimeout(_sliderSettleTimer);
+    _sliderSettleTimer = setTimeout(() => {
+      _sliderSettleTimer = null;
+      sendIKQuiet(getRequestedDurationMs());
+    }, 80);
+  }
+
+  function jogFromIK(axis) {
+    const el = document.getElementById('ik-' + axis); if (!el) return;
+    const val = parseFloat(el.value);
+    const sideEl = document.getElementById('side-' + axis);
+    if (sideEl) {
+      sideEl.value = val;
+      upSlider('side-' + axis);
+      const label = document.getElementById('side-' + axis + '-v');
+      if (label) label.textContent = val + 'mm';
+    }
+    ikWorkspaceCheck(false);
+    if (typeof update3DTarget !== 'undefined') update3DTarget();
+  }
+
+  function jogSlider(axis) {
+    const el = document.getElementById('side-' + axis); if (!el) return;
+    const val = parseFloat(el.value);
+    const targetEl = document.getElementById('ik-' + axis);
+    if (targetEl) {
+      targetEl.value = val;
+      clampIkInputValue('ik-' + axis);
+      upSlider('ik-' + axis);
+    }
+    upSlider('side-' + axis);
+    const label = document.getElementById('side-' + axis + '-v');
+    if (label) label.textContent = val + 'mm';
+    ikWorkspaceCheck(false);
+    if (typeof update3DTarget !== 'undefined') update3DTarget();
+  }
+
+  function jogCyl() {
+    const r = parseFloat(document.getElementById('cyl-r').value);
+    const t = parseFloat(document.getElementById('cyl-t').value);
+    const z = parseFloat(document.getElementById('cyl-z').value);
+    document.getElementById('cyl-r-v').textContent = r + 'mm';
+    document.getElementById('cyl-t-v').textContent = t + '°';
+    document.getElementById('cyl-z-v').textContent = z + 'mm';
+    const rad = t * Math.PI / 180;
+    const x = Math.round(r * Math.cos(rad)), y = Math.round(r * Math.sin(rad));
+    document.getElementById('ik-x').value = x;
+    document.getElementById('ik-y').value = y;
+    document.getElementById('ik-z').value = z;
+    upSlider('ik-x');
+    upSlider('ik-y');
+    upSlider('ik-z');
+
+    // Sync side (Cartesian) sliders too!
+    ['x','y','z'].forEach(axis => {
+      const sideEl = document.getElementById('side-' + axis);
+      if (sideEl) {
+        sideEl.value = (axis === 'x' ? x : axis === 'y' ? y : z);
+        upSlider('side-' + axis);
+      }
+    });
+
+    ikWorkspaceCheck(false);
+    if (typeof update3DTarget !== 'undefined') update3DTarget();
+  }
+
+  function setCoordMode(mode) {
+    _coordMode = mode;
+    const mc = document.getElementById('mode-cart'), my = document.getElementById('mode-cyl');
+    if (mc) mc.classList.toggle('active', mode === 'cart');
+    if (my) my.classList.toggle('active', mode === 'cyl');
+    const cartDiv = document.getElementById('sliders-cart');
+    const cylDiv  = document.getElementById('sliders-cyl');
+    if (cartDiv) cartDiv.style.display = mode === 'cart' ? '' : 'none';
+    if (cylDiv)  cylDiv.style.display  = mode === 'cyl'  ? '' : 'none';
+  }
+
+  function setJogDelta(v) {
+    _jogDelta = v;
+    [1, 5, 10, 25].forEach(n => {
+      const b = document.getElementById('jd' + n); if (!b) return;
+      b.classList.toggle('active', n === v);
+    });
+  }
+
+  function stepJog(axis, sign) {
+    const id = axis === 'x' ? 'ik-x' : axis === 'y' ? 'ik-y' : 'ik-z';
+    const el = document.getElementById(id); if (!el) return;
+    // FIX: gdy pole zostało wyczyszczone przez użytkownika, parseFloat('') daje NaN,
+    // a NaN + cokolwiek to wciąż NaN — pole wizualnie "zawieszało się" na tekście "NaN".
+    // Traktujemy puste/niepoprawne pole jako 0 przed dodaniem kroku.
+    const current = parseFloat(el.value);
+    el.value = (Number.isFinite(current) ? current : 0) + sign * _jogDelta;
+    clampIkInputValue(id);
+
+    // Send a JOG command instead of STOP+MOVL
+    send(`JOG ${axis.toUpperCase()} ${sign * _jogDelta}`);
+  }
+
+  function sendGear1() { send(`GEAR1 ${document.getElementById('gear1-in').value}`); }
+  function sendGear2() { send(`GEAR2 ${document.getElementById('gear2-in').value}`); }
+
+  // ─── Tabs ────────────────────────────────────────
+  function swTab(name, el) {
+    document.querySelectorAll('.tc-content').forEach(t=>{ t.classList.remove('on'); t.style.display=''; });
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    const target=document.getElementById('tab-'+name);
+    target.style.display='flex';
+    requestAnimationFrame(()=>target.classList.add('on'));
+    el.classList.add('on');
+  }
+
+  // ─── Sequencer ───────────────────────────────────
+  let sequence=[], isPlaying=false, seqEditorDirty=false;
+  function getSeqEditor() { return document.getElementById('seq-editor'); }
+  function lineForWaypoint(p) {
+    if(p.type==='wait') return `WAIT ${p.dur}`;
+    if(p.type==='servo') return `${p.cmd} ${p.val}`;
+    const parts=[p.mode||'MOV',`X${p.x??0}`,`Y${p.y??0}`,`Z${p.z??0}`,`W${p.w??0}`,`J4${p.j4??90}`,`J5${p.j5??90}`,`D${p.dur??1000}`];
+    if(p.mx!=null) parts.push(`DX${p.mx}`);
+    if(p.my!=null) parts.push(`DY${p.my}`);
+    return parts.join(' ');
+  }
+  function sequenceToText() { return sequence.map(lineForWaypoint).join('\n'); }
+  function parseSeqLine(line, index) {
+    const clean=line.trim();
+    if(!clean||clean.startsWith('#')) return null;
+    const tokens=clean.split(/\s+/);
+    const cmd=tokens[0].toUpperCase();
+    if(/^A[456]$/.test(cmd)) {
+      const val=parseInt(tokens[1],10);
+      if(!Number.isFinite(val)) throw new Error(`Invalid ${cmd} value on line ${index+1}`);
+      return {type:'servo',cmd,val};
+    }
+    if(cmd==='WAIT'||cmd==='W') {
+      const dur=parseInt(tokens[1],10);
+      if(!Number.isFinite(dur)||dur<0) throw new Error(`Invalid WAIT duration on line ${index+1}`);
+      return {type:'wait',dur};
+    }
+    if(!/^MOVL?$/.test(cmd)) throw new Error(`Unknown command on line ${index+1}: ${tokens[0]}`);
+    const entry={type:'pose',mode:cmd,x:0,y:0,z:0,w:0,j4:90,j5:90,dur:1000};
+    tokens.slice(1).forEach(token=>{
+      const m=token.match(/^([A-Za-z]+)([+-]?\d+(?:\.\d+)?)$/);
+      if(!m) return;
+      const key=m[1].toUpperCase();
+      const value=Number(m[2]);
+      if(!Number.isFinite(value)) return;
+      switch(key) {
+        case 'X': entry.x=value; break;
+        case 'Y': entry.y=value; break;
+        case 'Z': entry.z=value; break;
+        case 'W': entry.w=value; break;
+        case 'J4': entry.j4=value; break;
+        case 'J5': entry.j5=value; break;
+        case 'D': entry.dur=Math.max(1,value); break;
+        case 'DX': entry.mx=value; break;
+        case 'DY': entry.my=value; break;
+      }
+    });
+    return entry;
+  }
+  function textToSequence(value) {
+    const lines=value.split('\n');
+    const parsed=[];
+    lines.forEach((line,index)=>{
+      const item=parseSeqLine(line,index);
+      if(item) parsed.push(item);
+    });
+    return parsed;
+  }
+  function markSeqDirty() { seqEditorDirty=true; }
+  function syncSeqToEditor() {
+    const editor=getSeqEditor();
+    if(!editor) return;
+    editor.value=sequenceToText();
+    seqEditorDirty=false;
+  }
+  function syncSeqEditorToSequence() {
+    const editor=getSeqEditor();
+    if(!editor) return;
+    try{
+      sequence=textToSequence(editor.value);
+      renderSeq();
+      log('Editor synced to sequence','i');
+      seqEditorDirty=false;
+    }catch(err){
+      log('Editor parse error: '+err.message,'e');
+      seqEditorDirty=true;
+    }
+  }
+  function recPose() {
+    sequence.push({type:'pose',mode:'MOV',x:lastPos.x,y:lastPos.y,z:lastPos.z,w:lastPos.w??0,j1:lastPos.j1,j2:lastPos.j2,j3:lastPos.j3,j4:lastPos.j4,j5:lastPos.j5,dur:parseInt(document.getElementById('ik-dur').value, 10)||1000,mx:microX,my:microY});
+    syncSeqToEditor();
+    renderSeq(); log(`Recorded Pose #${sequence.length} (X:${Math.round(lastPos.x)} Y:${Math.round(lastPos.y)} Z:${Math.round(lastPos.z)})`,'i');
+  }
+  function addWait() {
+    sequence.push({type:'wait',dur:parseInt(document.getElementById('ik-dur').value, 10)||1000});
+    syncSeqToEditor();
+    renderSeq(); log(`Added Wait #${sequence.length}`,'i');
+  }
+  function clearSeq() { if(isPlaying)stopSeq(); sequence=[]; syncSeqToEditor(); renderSeq(); }
+  function removeWP(idx) { sequence.splice(idx,1); syncSeqToEditor(); renderSeq(); }
+  function renderSeq(hi=-1) {
+    const preview=document.getElementById('seq-list-preview');
+    preview.innerHTML='';
+    if(sequence.length===0) {
+      const empty=document.createElement('div');
+      empty.className='sd-empty';
+      empty.textContent='No waypoints recorded';
+      preview.appendChild(empty);
+      return;
+    }
+    sequence.forEach((p,i)=>{
+      const row=document.createElement('div');
+      row.className='seq-row';
+      if(i===hi) row.classList.add('playing');
+      const text=p.type==='wait'?`WAIT ${p.dur}`:lineForWaypoint(p);
+      row.textContent=`${i+1}. ${text}`;
+      preview.appendChild(row);
+    });
+  }
+  async function playSeq() {
+    if(seqEditorDirty){
+      syncSeqEditorToSequence();
+      if(seqEditorDirty){
+        resetPlayBtn();
+        log('Playback aborted: invalid editor syntax','e');
+        return;
+      }
+    }
+    if(sequence.length===0) return;
+    if(!ws || ws.readyState !== WebSocket.OPEN){ log('ERR: Cannot start playback while disconnected','e'); return; }
+    isPlaying=true;
+    const btn=document.getElementById('play-btn');
+    btn.textContent='⏹ Stop'; btn.className='btn btn-danger';
+    log(`Playback started (${sequence.length} steps)`,'i');
+    let completed=true;
+    for(let i=0;i<sequence.length;i++){
+      if(!isPlaying) { completed=false; break; }
+      // FIX: dawniej, gdy połączenie WS padło w trakcie odtwarzania, send() tylko
+      // logował błąd, a pętla mimo to czekała pełny czas trwania ruchu (await setTimeout)
+      // i przechodziła dalej, zakładając, że ramię fizycznie wykonało krok. Dla realnego
+      // robota to bezpieczne zachowanie tylko w teorii: kolejne polecenia mogłyby zostać
+      // wysłane z założeniem nieistniejącej pozycji startowej. Przerywamy odtwarzanie,
+      // gdy nie ma aktywnego połączenia.
+      if(!ws || ws.readyState !== WebSocket.OPEN){
+        log('Playback aborted: connection lost mid-sequence','e');
+        completed=false;
+        break;
+      }
+      const p=sequence[i]; renderSeq(i);
+      const rows=document.querySelectorAll('#seq-list-preview .seq-row');
+      if(rows[i]) rows[i].scrollIntoView({block:'nearest'});
+      if(p.type==='wait'){
+        await new Promise(r=>setTimeout(r,parseInt(p.dur, 10)));
+      } else if(p.type==='servo'){
+        send(`${p.cmd} ${p.val}`);
+        await new Promise(r=>setTimeout(r,200));
+      } else {
+        const j4v=p.j4??90, j5v=p.j5??90;
+        const cmd=`${p.mode||'MOV'} X${Math.round(p.x??0)} Y${Math.round(p.y??0)} Z${Math.round(p.z??0)} W${Math.round(p.w??0)} J4${Math.round(j4v)} J5${Math.round(j5v)} D${p.dur}`;
+        send(cmd);
+        if(p.mx!=null){
+          const dx=parseInt(p.mx, 10)-microX, dy=parseInt(p.my??0, 10)-microY;
+          if(dx!==0) send(`DX ${dx}`);
+          if(dy!==0) send(`DY ${dy}`);
+          microX=parseInt(p.mx, 10); microY=parseInt(p.my??0, 10);
+          updateMicroDisplay();
+        }
+        await new Promise(r=>setTimeout(r,parseInt(p.dur, 10)+60));
+      }
+    }
+    isPlaying=false; renderSeq(); resetPlayBtn();
+    if(completed) log('Playback finished','i');
+  }
+  function stopSeq(){ isPlaying=false; renderSeq(); resetPlayBtn(); send('ESTOP'); log('Playback stopped','i'); }
+  function resetPlayBtn(){ const btn=document.getElementById('play-btn'); btn.textContent='Play'; btn.className='btn btn-success'; }
+  function exportSeq(){
+    if(seqEditorDirty){
+      syncSeqEditorToSequence();
+      if(seqEditorDirty){
+        log('Export aborted: invalid editor syntax','e');
+        return;
+      }
+    }
+    const blob=new Blob([sequenceToText()],{type:'text/plain'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='sequence.txt'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }
+  function importSeq(evt){
+    if(isPlaying)stopSeq();
+    const file=evt.target.files[0]; if(!file) return;
+    const fr=new FileReader();
+    fr.onload=e=>{
+      try{
+        const raw=e.target.result;
+        let imported;
+        const fileName=file.name.toLowerCase();
+        const isJson=file.type.includes('json')||fileName.endsWith('.json');
+        if(isJson){
+          imported=JSON.parse(raw);
+          if(!Array.isArray(imported)) throw new Error('Not an array');
+          imported.forEach((p,i)=>{if(typeof p!=='object'||!p.type) throw new Error(`Invalid waypoint ${i}`)});
+          sequence=imported;
+        } else {
+          sequence=textToSequence(String(raw));
+        }
+        syncSeqToEditor();
+        renderSeq();
+        log(`Imported ${sequence.length} waypoints`,'i');
+      }catch(err){
+        log('Import error: '+err.message,'e');
+      }
+    };
+    fr.readAsText(file); evt.target.value='';
+  }
+  syncSeqToEditor();
+  renderSeq();
+
+  // ─── SD Card ─────────────────────────────────────
+  let savedPositions=[];
+  function renderSDList() {
+    const el=document.getElementById('sd-list');
+    if (!el) return;
+    el.innerHTML='';
+    if(savedPositions.length===0){
+      const empty=document.createElement('div');
+      empty.className='sd-empty';
+      empty.textContent='No saved positions yet';
+      el.appendChild(empty);
+      return;
+    }
+    savedPositions.forEach((pos,i)=>{
+      // FIX: poprzednio nazwa pozycji (pos.name) i indeks trafiały bezpośrednio do
+      // innerHTML oraz do atrybutu onclick jako wstawiony string. Każdy znak ' " < >
+      // w nazwie (np. wpisany ręcznie w polu i tylko częściowo "oczyszczony" przez
+      // doSave) mógł złamać znacznik albo wstrzyknąć dowolny JS/HTML (XSS).
+      // Budujemy teraz DOM bezpiecznie przez textContent + addEventListener,
+      // tak jak już robi to reszta kodu (patrz pierwowzór updateSDList).
+      const item=document.createElement('div'); item.className='sd-item';
+
+      const nameEl=document.createElement('span');
+      nameEl.className='sd-name';
+      nameEl.textContent=pos.name;
+
+      const anglesEl=document.createElement('span');
+      anglesEl.className='sd-angles';
+      // Wpisy pochodzące tylko z urządzenia (przez SD_FILES) nie mają jeszcze
+      // znanych kątów – pokazujemy placeholder, a nie "undefined°".
+      if (pos.j1 !== undefined) {
+        anglesEl.textContent = `J1:${pos.j1}° J2:${pos.j2}° J3:${pos.j3}° `;
+        const wrist=document.createElement('span');
+        wrist.style.color='var(--yellow)';
+        wrist.textContent=`J4:${pos.j4}° J5:${pos.j5}°`;
+        anglesEl.appendChild(wrist);
+      } else {
+        anglesEl.textContent='(no cached pose)';
+      }
+
+      const loadBtn=document.createElement('button');
+      loadBtn.className='asnd'; loadBtn.style.padding='3px 8px'; loadBtn.textContent='Load';
+      loadBtn.addEventListener('click', () => loadSD(pos.name));
+
+      const delBtn=document.createElement('button');
+      delBtn.className='asnd'; delBtn.style.padding='3px 8px'; delBtn.textContent='Del';
+      delBtn.addEventListener('click', () => removeSD(i));
+
+      item.append(nameEl, anglesEl, loadBtn, delBtn);
+      el.appendChild(item);
+    });
+  }
+  function doSave(){
+    const nameInput=document.getElementById('sd-name');
+    if(!nameInput) return; // FIX: brak elementu w DOM nie powoduje już wyjątku
+    const name=nameInput.value.trim().toLowerCase().replace(/\s+/g,'_');
+    if(!name) return;
+    send(`SAVE ${name}`);
+    const entry={name,j1:parseFloat(lastPos.j1.toFixed(1)),j2:parseFloat(lastPos.j2.toFixed(1)),j3:parseFloat(lastPos.j3.toFixed(1)),j4:parseFloat(lastPos.j4.toFixed(0)),j5:parseFloat(lastPos.j5.toFixed(0))};
+    const existing=savedPositions.findIndex(p=>p.name===name);
+    if(existing>=0) savedPositions[existing]=entry; else savedPositions.push(entry);
+    renderSDList(); nameInput.value='';
+  }
+  function doLoad(){
+    const nameInput=document.getElementById('sd-name');
+    if(!nameInput) return; // FIX: defensywny guard, jak w doSave()
+    const name=nameInput.value.trim().toLowerCase().replace(/\s+/g,'_');
+    if(name) send(`LOAD ${name}`);
+  }
+  function loadSD(name){ send(`LOAD ${name}`); }
+  function removeSD(idx){ savedPositions.splice(idx,1); renderSDList(); }
+  function doRun(){
+    const nameInput=document.getElementById('seq-name');
+    if(!nameInput) return; // FIX: defensywny guard, jak w doSave()
+    const name=nameInput.value.trim().toLowerCase().replace(/\s+/g,'_');
+    if(name) send(`RUN ${name}`);
+  }
+
+
+  // ─── Terminal ────────────────────────────────────
+  const MAX_LOG=700; let logCount=0;
+  function log(msg, type='i') {
+    const term=document.getElementById('term');
+    const el=document.createElement('div');
+    const cssMap={s:'ls',r:'lr',e:'le',i:'li',w:'lw',p:'lp',h:'lh'};
+    el.className=cssMap[type]||'li';
+    const ts=new Date().toLocaleTimeString('en-GB',{hour12:false});
+    const tsEl=document.createElement('span');
+    tsEl.style.cssText='color:var(--text-dim);font-size:9px;margin-right:8px;';
+    tsEl.textContent=`[${ts}]`;
+    const msgEl=document.createElement('span'); msgEl.textContent=msg;
+    el.appendChild(tsEl); el.appendChild(msgEl);
+    term.appendChild(el);
+    if(++logCount>MAX_LOG) term.firstChild.remove();
+    requestAnimationFrame(()=>{ term.scrollTop=term.scrollHeight; });
+  }
+  function clearLog(){ document.getElementById('term').innerHTML=''; logCount=0; }
+
+  // ─── Manual input with history ───────────────────
+  let cmdHistory=[], histIdx=-1;
+  function handleKey(e) {
+    if(e.key==='Enter'){ sendManual(); return; }
+    if(e.key==='ArrowUp'){ if(histIdx<cmdHistory.length-1){ histIdx++; document.getElementById('mi').value=cmdHistory[histIdx]; } e.preventDefault(); }
+    if(e.key==='ArrowDown'){ if(histIdx>0){ histIdx--; document.getElementById('mi').value=cmdHistory[histIdx]; } else{ histIdx=-1; document.getElementById('mi').value=''; } e.preventDefault(); }
+  }
+  function sendManual(){
+    const inp=document.getElementById('mi');
+    const cmd=inp.value.trim(); if(!cmd) return;
+    cmdHistory.unshift(cmd); if(cmdHistory.length>50) cmdHistory.pop();
+    histIdx=-1; send(cmd.toUpperCase()); inp.value='';
+  }
+
+
+  // ─── Theme Toggle ────────────────────────────────
+  let isDark = localStorage.getItem('robot-theme') !== null ? localStorage.getItem('robot-theme') === 'dark' : true; // default dark (matches html class)
+  function applyTheme(dark) {
+    isDark = !!dark;
+    document.documentElement.classList.toggle('dark', isDark);
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = isDark ? 'Dark' : 'Light';
+    localStorage.setItem('robot-theme', isDark ? 'dark' : 'light');
+  }
+  function toggleTheme(){ applyTheme(!isDark); }
+  applyTheme(isDark);
+
+  window.addEventListener('beforeunload', () => safeCloseSocket());
+
+  // ─── Init ────────────────────────────────────────
+  ['j1','j2','j3','j4','j5'].forEach(id=>upSlider(id));
+  ['j1','j2','j3','j4','j5'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.addEventListener('change',()=>{
+      let cmd;
+      if (id==='j1') cmd='D1';
+      else if (id==='j2') cmd='D2';
+      else if (id==='j3') cmd='D3';
+      else if (id==='j4') cmd='A4';
+      else if (id==='j5') cmd='A5';
+      if (cmd) sendAx(cmd, id);
+    });
+  });
+  ['ik-x','ik-y','ik-z','ik-wrist','ik-j4','ik-j5'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const isIkAxis=id==='ik-x'||id==='ik-y'||id==='ik-z';
+    el.addEventListener('input',()=>{ if(isIkAxis) { clampIkInputValue(id); upSlider(id); jogFromIK(id.slice(3)); } else scheduleIkWorkspaceCheck(); });
+    el.addEventListener('change',()=>{ if(isIkAxis) { clampIkInputValue(id); settleSliderMove(); } else scheduleIkWorkspaceCheck(); });
+  });
+  ['side-x','side-y','side-z','cyl-r','cyl-t','cyl-z'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    upSlider(id);
+    el.addEventListener('change', settleSliderMove);
+  });
+  ['side-x-v','side-y-v'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0mm'; });
+  const sideZ = document.getElementById('side-z-v'); if (sideZ) sideZ.textContent = '215mm';
+  const cylR = document.getElementById('cyl-r-v'); if (cylR) cylR.textContent = '150mm';
+  const cylT = document.getElementById('cyl-t-v'); if (cylT) cylT.textContent = '0°';
+  const cylZ = document.getElementById('cyl-z-v'); if (cylZ) cylZ.textContent = '215mm';
+  document.getElementById('ik-movl')?.addEventListener('change', updateMotionEstimate);
+  setCoordMode('cart');
+  setJogDelta(5);
+  upDur(); upSpeed();
+  updateWristModeUI(); ikWorkspaceCheck();
+  renderSDList(); updateMicroDisplay();
+  log('STPE ESP32 Wireless Panel - Enter IP and click Connect.','i');
+  log('Default AP: 192.168.4.1 | WS Port: 81','i');
+  log('E-STOP shortcut: Escape key','i');
+</script>
+
+<!-- ─── 3D PREVIEW ─── -->
+<script>
+  let scene, camera, renderer, controls;
+  let j1Group, j2Group, j3Group, tcpGroup, toolMesh, targetMesh;
+  const RAD = Math.PI / 180;
+  const G = { BASE_H: 143.896, L1: 185.845, L2: 225.478, L3: 36.105, TOOL_TOTAL_LEN: 31.530 };
+  let previewOpen = false;
+
+  let _rafHandle = null;
+  function toggle3DView() {
+    previewOpen = !previewOpen;
+    document.getElementById('preview-pop').classList.toggle('open', previewOpen);
+    if (previewOpen) {
+      if (!scene) init3D();
+      update3DTarget();
+      // FIX: poprzednio animate() planował kolejną ramkę bezwarunkowo, więc po
+      // pierwszym otwarciu podglądu 3D pętla rAF działała w tle bez końca przez
+      // cały czas życia strony (zużycie CPU/baterii), nawet z zamkniętym panelem.
+      // Teraz pętlę uruchamiamy tylko, gdy panel jest otwarty, i zatrzymujemy
+      // po jego zamknięciu.
+      if (_rafHandle === null) animate();
+    } else if (_rafHandle !== null) {
+      cancelAnimationFrame(_rafHandle);
+      _rafHandle = null;
+    }
+  }
+
+  function init3D() {
+    const container = document.getElementById('pv-canvas-container');
+    const width = container.clientWidth, height = container.clientHeight;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x161618);
+    camera = new THREE.PerspectiveCamera(45, width/height, 1, 2000);
+    camera.up.set(0,0,1); camera.position.set(600,-350,380);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,0,200); controls.enableDamping=true;
+
+    const gridHelper = new THREE.GridHelper(600,20,0x444444,0x222222);
+    gridHelper.rotation.x = Math.PI/2; scene.add(gridHelper);
+    const hemiLight = new THREE.HemisphereLight(0xffffff,0x444444,0.6);
+    hemiLight.position.set(0,0,500); scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff,0.8);
+    dirLight.position.set(300,300,500); scene.add(dirLight);
+
+    const matBase = new THREE.MeshPhongMaterial({color:0x3b7dd8});
+    const matL1 = new THREE.MeshPhongMaterial({color:0x1db870});
+    const matL2a = new THREE.MeshPhongMaterial({color:0xc98a14});
+    const matL2b = new THREE.MeshPhongMaterial({color:0xd4621a});
+    const matTool = new THREE.MeshPhongMaterial({color:0xd94040});
+
+    const mkCyl=(r,h,mat)=>{ const geo=new THREE.CylinderGeometry(r,r,h,20); geo.rotateX(Math.PI/2); geo.translate(0,0,h/2); return new THREE.Mesh(geo,mat); };
+
+    j1Group=new THREE.Group(); j1Group.position.set(0,0,G.BASE_H); scene.add(j1Group);
+    j2Group=new THREE.Group(); j1Group.add(j2Group);
+    j2Group.add(mkCyl(12,G.L1,matL1));
+    j3Group=new THREE.Group(); j3Group.position.set(0,0,G.L1); j2Group.add(j3Group);
+    j3Group.add(mkCyl(10,G.L2,matL2a));
+    tcpGroup=new THREE.Group(); tcpGroup.position.set(0,0,G.L2); j3Group.add(tcpGroup);
+    const toolGeo=new THREE.CylinderGeometry(3,3,40,8); toolGeo.rotateZ(Math.PI/2); toolGeo.translate(20,0,0); toolMesh=new THREE.Mesh(toolGeo,matTool); tcpGroup.add(toolMesh);
+    const crossBarGeo=new THREE.CylinderGeometry(2.5,2.5,30,8); crossBarGeo.translate(40,0,0); tcpGroup.add(new THREE.Mesh(crossBarGeo,matTool));
+    targetMesh=new THREE.Mesh(new THREE.SphereGeometry(6,12,12),new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true})); scene.add(targetMesh);
+
+    animate();
+    window.addEventListener('resize',()=>{ if(!previewOpen) return; const w=container.clientWidth,h=container.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); });
+  }
+
+  function animate(){
+    if(!previewOpen){ _rafHandle=null; return; } // FIX: zatrzymuje pętlę, gdy panel jest zamknięty
+    _rafHandle=requestAnimationFrame(animate);
+    if(controls) controls.update();
+    if(renderer&&scene&&camera) renderer.render(scene,camera);
+  }
+
+  function update3DTarget(){
+    if(!scene||!previewOpen) return;
+    const mode=document.getElementById('preview-mode').value;
+    let j1,j2,j3,j4;
+    if(mode==='LIVE'){
+      j1=lastPos.j1; j2=lastPos.j2; j3=lastPos.j3; j4=lastPos.j4;
+      targetMesh.visible=false;
+    } else {
+      const xEl=document.getElementById('ik-x'), yEl=document.getElementById('ik-y'), zEl=document.getElementById('ik-z');
+      const rx=parseFloat(xEl.value)||0, ry=parseFloat(yEl.value)||0, rz=parseFloat(zEl.value)||0;
+      targetMesh.position.set(rx,ry,rz); targetMesh.visible=true;
+      j1=parseFloat(document.getElementById('fk-j1').textContent);
+      j2=parseFloat(document.getElementById('fk-j2').textContent);
+      j3=parseFloat(document.getElementById('fk-j3').textContent);
+      j4=parseFloat(document.getElementById('fk-j4').textContent);
+      if(isNaN(j1)){ j1=parseFloat(document.getElementById('j1').value)||0; j2=parseFloat(document.getElementById('j2').value)||0; j3=parseFloat(document.getElementById('j3').value)||0; j4=parseFloat(document.getElementById('j4').value)||90; }
+    }
+    if(isNaN(j1)) return;
+    j1Group.rotation.z=j1*RAD;
+    j2Group.rotation.y=j2*RAD;
+    j3Group.rotation.y=j3*RAD;
+    tcpGroup.rotation.z=0;
+    tcpGroup.rotation.y=(j4*RAD-Math.PI/2);
+  }
+</script>
+
+</body>
+</html>
+

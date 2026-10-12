@@ -1,0 +1,89 @@
+╔════════════════════════════════════════════════════════════════╗
+║              FIRMWARE FOLDER STRUCTURE                         ║
+╚════════════════════════════════════════════════════════════════╝
+
+Firmware/
+│
+├── README.md .......................... Main documentation
+│
+├── Teensy_4.1/ ....................... Robot Controller
+│   ├── Simple_Control/
+│   │   └── Simple_Control.ino ........ Direct axis control
+│   ├── IK_Control/
+│   │   └── IK_Control.ino ............ IK + USB Host + All features
+│   └── Pinout_Teensy.txt ............. Complete pinout reference
+│
+├── ESP32_C3/ ......................... Wireless Controllers ⭐
+│   ├── Master_Gesture_ESPNOW/
+│   │   └── Master_Gesture_ESPNOW.ino . Wireless gesture controller
+│   ├── Slave_ESPNOW/
+│   │   └── Slave_ESPNOW.ino .......... Bridge to Teensy
+│   ├── Pinout_ESP32.txt .............. ESP32-C3 pinout
+│   └── README.md ..................... ESP-NOW setup guide
+│
+└── Arduino_ProMicro/ ................. Legacy (Wired)
+    ├── Master_Controller/
+    │   └── Master_Controller.ino ..... Potentiometer control
+    ├── Master_Gesture/
+    │   └── Master_Gesture.ino ........ Wired gesture control
+    └── Pinout_ProMicro.txt ........... Pro Micro pinout
+
+═══════════════════════════════════════════════════════════════
+ RECOMMENDED SETUP
+═══════════════════════════════════════════════════════════════
+
+┌─────────────────┐                    ┌─────────────────┐
+│  ESP32-C3 #1    │                    │  ESP32-C3 #2    │
+│  (Master)       │  ═══ ESP-NOW ═══>  │  (Slave)        │
+│                 │   (Wireless)       │                 │
+│ • MPU6050       │                    │ • Serial Bridge │
+│ • Joystick      │                    └────────┬────────┘
+│ • Clutch        │                             │
+│ • Battery       │                        Serial UART
+└─────────────────┘                             │
+                                                 ▼
+                                        ┌─────────────────┐
+                                        │  Teensy 4.1     │
+                                        │  (Robot - URDF) │
+                                        │                 │
+                                        │ • 6x TMC2209    │
+                                        │ • 1x Servo(Grip)│
+                                        │ • 3x AS5600     │
+                                        └─────────────────┘
+
+═══════════════════════════════════════════════════════════════
+ QUICK START
+═══════════════════════════════════════════════════════════════
+
+1. Upload to Teensy:
+   → Teensy_4.1/IK_Control/IK_Control.ino
+
+2. Upload to ESP32 Master:
+   → ESP32_C3/Master_Gesture_ESPNOW/Master_Gesture_ESPNOW.ino
+   → Note MAC address
+
+3. Upload to ESP32 Slave:
+   → ESP32_C3/Slave_ESPNOW/Slave_ESPNOW.ino
+   → Note MAC address
+   → Update Master code with Slave MAC
+   → Re-upload Master
+
+4. Wire ESP32 Slave to Teensy:
+   ESP32 TX (GPIO 21) → Teensy RX (Pin 0)
+   ESP32 RX (GPIO 20) → Teensy TX (Pin 1)
+   ESP32 GND → Teensy GND
+
+5. Power on and test!
+   → Press clutch on Master
+   → Tilt hand → Robot moves!
+
+═══════════════════════════════════════════════════════════════
+ FILE SIZES (Approximate)
+═══════════════════════════════════════════════════════════════
+
+Simple_Control.ino ........... ~14KB (Teensy)
+IK_Control.ino ............... ~15KB (Teensy)
+Master_Gesture_ESPNOW.ino .... ~9KB  (ESP32)
+Slave_ESPNOW.ino ............. ~4KB  (ESP32)
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,452 @@
+/**
+ * console.css - Soft Neutral Industrial Serial Terminal & Protocol Monitor
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ */
+
+/* ============================================================================
+   MASTER CONSOLE PANEL CONTAINER
+   ============================================================================ */
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  transition: border-color var(--transition-fast);
+}
+
+.console-panel.collapsed { height: auto !important; }
+
+.console-panel.collapsed .console-body,
+.console-panel.collapsed .console-filters,
+.console-panel.collapsed .quick-commands-bar,
+.console-panel.collapsed .console-prompt-area { display: none !important; }
+
+/* ============================================================================
+   TERMINAL HEADER BAR
+   ============================================================================ */
+
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--spacing-md);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-metallic);
+  user-select: none;
+  flex-shrink: 0;
+  min-height: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-sm);
+}
+
+.console-title-area {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.console-title {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Live indicator dot */
+.console-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  flex-shrink: 0;
+}
+
+.console-count-badge {
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  border: 1px solid var(--border-metallic);
+  font-variant-numeric: tabular-nums;
+}
+
+.console-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.console-btn {
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  border: 1px solid var(--border-metallic);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2xs);
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.console-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.console-btn:active { transform: translateY(1px); }
+
+.autoscroll-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  padding: 0 var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-sm);
+}
+
+.autoscroll-toggle input[type="checkbox"] {
+  accent-color: #cbd5e1;
+  cursor: pointer;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+}
+
+/* ============================================================================
+   FILTER CHIPS BAR
+   ============================================================================ */
+
+.console-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border-metallic);
+  overflow-x: auto;
+  user-select: none;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-inset);
+}
+
+.filter-chip {
+  font-size: var(--font-size-2xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-metallic);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-sm);
+}
+
+.filter-chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.filter-chip:active { transform: translateY(1px); }
+
+.filter-chip.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   TERMINAL LOG STREAM VIEWPORT
+   ============================================================================ */
+
+.console-body {
+  flex: 1 1 auto;
+  min-height: 60px;
+  height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 6px 10px;
+  background: var(--bg-inset);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  box-sizing: border-box;
+  box-shadow: var(--shadow-inset);
+}
+
+.console-body::-webkit-scrollbar { width: 4px; height: 4px; }
+.console-body::-webkit-scrollbar-track { background: var(--bg-inset); }
+.console-body::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 2px;
+}
+.console-body::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+/* Individual log row */
+.log-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  word-break: break-all;
+  padding: 2px 0;
+  border-radius: 1px;
+  transition: background-color var(--transition-instant);
+}
+
+.log-line:hover { background: rgba(255, 255, 255, 0.03); }
+
+/* Timestamp */
+.log-timestamp {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* Message type badge chips */
+.log-badge {
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+  flex-shrink: 0;
+  min-width: 38px;
+  text-align: center;
+  letter-spacing: var(--letter-spacing-sm);
+  border: 1px solid transparent;
+}
+
+/* TX: soft titanium neutral */
+.badge-tx {
+  background: rgba(226, 232, 240, 0.10);
+  color: #f1f5f9;
+  border-color: rgba(226, 232, 240, 0.25);
+}
+
+/* RX: soft emerald */
+.badge-rx {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* JTELEM: subtle stream */
+.badge-jtelem {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-color: var(--border-metallic);
+}
+
+/* ALERT / COLLISION: warm amber */
+.badge-alert,
+.badge-collision {
+  background: var(--neon-amber-subtle);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+/* ERROR: soft crimson */
+.badge-error {
+  background: var(--neon-crimson-subtle);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+/* WARN: amber */
+.badge-warn {
+  background: rgba(217, 119, 6, 0.10);
+  color: #f59e0b;
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
+/* INFO / LOG: neutral */
+.badge-info,
+.badge-log {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border-color: var(--border-metallic);
+}
+
+/* Log message text */
+.log-text {
+  color: var(--text-secondary);
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+/* Per-type syntax coloring */
+.log-line.type-error .log-text    { color: #fca5a5; }
+.log-line.type-warn .log-text     { color: #fde68a; }
+.log-line.type-tx .log-text       { color: #f1f5f9; }
+.log-line.type-rx .log-text       { color: #a7f3d0; }
+.log-line.type-jtelem .log-text   { color: var(--text-muted); }
+.log-line.type-alert .log-text,
+.log-line.type-collision .log-text { color: #fcd34d; }
+
+/* ============================================================================
+   QUICK COMMANDS KEYPAD BAR
+   ============================================================================ */
+
+.quick-commands-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-metallic);
+  overflow-x: auto;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.quick-cmd-btn {
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-metallic);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.quick-cmd-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.quick-cmd-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.quick-cmd-btn.estop {
+  color: #f87171;
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.quick-cmd-btn.estop:hover {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+/* ============================================================================
+   INTERACTIVE CLI PROMPT AREA
+   ============================================================================ */
+
+.console-prompt-area {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px 8px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-metallic);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.prompt-icon {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-family: var(--font-mono);
+  padding-left: 2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.console-input {
+  flex: 1;
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  outline: none;
+  caret-color: var(--text-primary);
+  box-shadow: var(--shadow-inset);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.console-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+
+.console-send-btn {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-metallic);
+  padding: 4px 12px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.console-send-btn:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.console-send-btn:active { transform: translateY(1px); }

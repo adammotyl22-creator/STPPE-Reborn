@@ -1,0 +1,718 @@
+/**
+ * viewport.css - Soft Neutral Modern 3D Viewport Bezel, Monospace HUD & CAD Camera Strip
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ */
+
+/* ============================================================================
+   3D VIEWPORT CAD CONTAINER — STRUCTURAL BEZEL FRAME
+   ============================================================================ */
+
+.viewport-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  background: var(--bg-void);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), var(--shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Active Status Motion Breathing Pulse */
+@keyframes viewport-active-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.2), inset 0 0 16px rgba(245, 158, 11, 0.06);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.75), inset 0 0 32px rgba(245, 158, 11, 0.25);
+  }
+}
+
+.viewport-container.robot-moving {
+  animation: viewport-active-pulse 1.8s ease-in-out infinite;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+}
+
+.viewport-canvas-wrapper {
+  position: relative;
+  flex: 1 1 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.viewport-canvas-wrapper canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  outline: none;
+  /* Prevents browser scroll/zoom from consuming pointer events during TCP drag */
+  touch-action: none;
+}
+
+/* ============================================================================
+   UNIFIED GLASS HUD RIBBON (TOP CONSOLIDATED TOOLBAR)
+   ============================================================================ */
+
+.unified-glass-ribbon {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  z-index: 25;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ribbon-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.unified-glass-ribbon .camera-toolbar {
+  position: static;
+  top: auto;
+  right: auto;
+  pointer-events: auto;
+}
+
+.ribbon-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+}
+
+.ribbon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-xs, 3px);
+  color: var(--text-muted, #94a3b8);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all var(--transition-fast, 120ms ease);
+}
+
+.ribbon-btn:hover {
+  background: rgba(51, 65, 85, 0.85);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ribbon-btn.active {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 600;
+  border-color: #ffffff;
+}
+
+.ribbon-snap-btn.active {
+  background: #10b981;
+  color: #042f2e;
+  border-color: #34d399;
+}
+
+.snap-icon,
+.timeline-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.snap-icon .ico {
+  width: 12px;
+  height: 12px;
+}
+
+.timeline-tab-icon .ico {
+  width: 13px;
+  height: 13px;
+}
+
+.ribbon-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.ribbon-chip-toggle:hover {
+  color: #ffffff;
+}
+
+.ribbon-chip-toggle input[type="checkbox"] {
+  accent-color: #10b981;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* ============================================================================
+   FLOATING MONOSPACE HUD OVERLAYS (TOP-LEFT)
+   ============================================================================ */
+
+.viewport-hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  pointer-events: auto;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.hud-pill:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.hud-pill-label {
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: var(--font-size-2xs);
+  letter-spacing: var(--letter-spacing-md);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.hud-coords {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  font-family: var(--font-telemetry);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-coord-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.hud-coord-item span.dim {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-telemetry);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-coord-item span.val {
+  color: var(--text-primary);
+  font-family: var(--font-telemetry);
+  font-weight: 600;
+  min-width: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Floor clearance / safety alert HUD indicator */
+.hud-alert-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  user-select: none;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.hud-alert-ok {
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.hud-alert-breach {
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.45);
+}
+
+/* ============================================================================
+   CAMERA PRESET STRIP — COMPACT SEGMENTED PILL (TOP-RIGHT)
+   ============================================================================ */
+
+.camera-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  z-index: 10;
+  overflow: visible;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.camera-btn {
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  padding: 3px 8px;
+  height: 24px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.camera-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.camera-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Active indicator */
+.camera-btn.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Keyboard shortcut key badge */
+.camera-btn .key-hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 12px;
+  min-width: 11px;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.camera-btn.active .key-hint {
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ============================================================================
+   VIEWPORT BOTTOM BAR — LEGEND & LAYER CONTROLS
+   ============================================================================ */
+
+.viewport-bottom-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  z-index: 10;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Dual-arm legend */
+.dual-arm-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 4px 12px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.dual-arm-legend:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-dot.live  { background: #e2e8f0; }
+.legend-dot.ghost { background: var(--accent-amber); }
+
+/* Inline SVG Icon Base Class */
+.ico {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* Viewport Vision & Layer Controls Popover Menu */
+.viewport-vision-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.btn-viewport-vision {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.btn-viewport-vision:hover {
+  background: rgba(30, 41, 59, 0.85);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-viewport-vision.active,
+.btn-viewport-vision[aria-expanded="true"] {
+  background: rgba(30, 34, 42, 0.98);
+  color: var(--text-primary);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 10px rgba(245, 158, 11, 0.15);
+}
+
+.vision-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.vision-btn-text {
+  line-height: 1;
+  font-weight: 600;
+}
+
+.vision-btn-chevron {
+  font-size: 9px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  line-height: 1;
+}
+
+.btn-viewport-vision.active .vision-btn-chevron,
+.btn-viewport-vision[aria-expanded="true"] .vision-btn-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-amber);
+}
+
+/* Viewport Vision Popover (Opens Upward) */
+.viewport-vision-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  min-width: 205px;
+  background: rgba(17, 19, 23, 0.97);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: bottom right;
+  transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.viewport-vision-popover.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px) scale(0.97);
+}
+
+.vision-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(24, 27, 34, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.vision-header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vision-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  opacity: 0.85;
+  color: var(--text-secondary);
+}
+
+.vision-popover-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.btn-vision-popover-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-vision-popover-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.vision-popover-body {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+}
+
+.vision-toggle-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.vision-toggle-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.vision-toggle-item input[type="checkbox"] {
+  accent-color: var(--accent-amber);
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vision-toggle-item:has(input:checked) {
+  color: var(--text-primary);
+}
+
+.vision-toggle-item .toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.vision-toggle-item:has(input:checked) .toggle-icon {
+  color: var(--text-primary);
+}
+
+.vision-toggle-item .toggle-icon .ico {
+  width: 14px;
+  height: 14px;
+}
+
+.vision-toggle-item .toggle-text {
+  flex: 1;
+}
+
+/* Fallback / legacy layer chips */
+.layer-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(20, 22, 28, 0.95);
+  padding: 3px 8px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.layer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 1px;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  user-select: none;
+}
+
+.layer-chip:hover { color: var(--text-secondary); }
+
+.layer-chip input[type="checkbox"] {
+  accent-color: #cbd5e1;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.layer-chip:has(input:checked) {
+  color: var(--text-primary);
+}
+
+/* ============================================================================
+   RESPONSIVE OVERLAY ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 1380px) {
+  .camera-btn { font-size: var(--font-size-2xs); padding: 3px 6px; }
+  .layer-chip { font-size: var(--font-size-2xs); }
+}
+
+@media (max-width: 980px) {
+  .viewport-bottom-bar { position: static; margin-top: 6px; }
+  .camera-toolbar { top: 6px; right: 6px; }
+  .viewport-hud { top: 6px; left: 6px; }
+}

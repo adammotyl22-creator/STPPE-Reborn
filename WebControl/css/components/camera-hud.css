@@ -1,0 +1,359 @@
+/* ============================================================================
+   CAMERA-HUD.CSS - Eye-in-Hand J5 USB Vision PIP HUD & Dock Tab Styling
+   Cyberpunk Dark Slate / Metallic Industrial Aesthetic (Zero Neon)
+   ============================================================================ */
+
+/* Floating Picture-in-Picture (PIP) HUD Overlay inside 3D Viewport */
+.camera-hud-overlay {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-metallic, #334155);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  transition: opacity var(--transition-fast, 150ms ease), border-color var(--transition-fast, 150ms ease);
+}
+
+.camera-hud-overlay:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* Docked state: firmly parked in bottom-right corner */
+.camera-hud-overlay.camera-hud-docked {
+  top: auto !important;
+  left: auto !important;
+  right: 16px !important;
+  bottom: 48px !important;
+  width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Minimized state: collapsed into a compact status pill badge */
+.camera-hud-overlay.camera-hud-minimized {
+  display: none !important;
+}
+
+.camera-pip-min-badge {
+  position: absolute;
+  bottom: 48px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary, #f8fafc);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 120;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all var(--transition-fast);
+}
+
+.camera-pip-min-badge:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.camera-pip-min-badge.hidden {
+  display: none !important;
+}
+
+/* Draggable Header Bar */
+.camera-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(30, 41, 59, 0.96);
+  border-bottom: 1px solid var(--border-metallic, #334155);
+  cursor: grab;
+}
+
+.camera-hud-header:active {
+  cursor: grabbing;
+}
+
+.camera-hud-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camera-hud-icon {
+  font-size: 13px;
+  color: #38bdf8;
+}
+
+.camera-hud-title {
+  font-family: var(--font-sans, system-ui);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary, #f8fafc);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.camera-hud-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted, #94a3b8);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.hud-control-btn .ico {
+  width: 12px;
+  height: 12px;
+}
+
+.hud-control-btn:hover {
+  background: var(--bg-hover, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-color: var(--border-metallic, #475569);
+}
+
+/* Canvas Display Area */
+.camera-pip-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-feed-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* PIP Toolbar Controls */
+.camera-pip-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(15, 23, 42, 0.98);
+  border-top: 1px solid var(--border-subtle, #1e293b);
+  gap: 6px;
+}
+
+.camera-action-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-cam-action {
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border-metallic, #334155);
+  color: var(--text-secondary, #cbd5e1);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.btn-cam-action:hover {
+  background: var(--bg-hover, #334155);
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+.btn-cam-action.btn-active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* Full Dock Tab: Vision & Inspection Studio */
+.vision-dock-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 12px;
+  height: 100%;
+  padding: 10px 14px;
+  box-sizing: border-box;
+}
+
+.vision-main-viewport {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border-metallic, #334155);
+  border-radius: var(--radius-xs, 4px);
+  overflow: hidden;
+}
+
+.vision-viewport-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid var(--border-subtle, #1e293b);
+}
+
+.vision-canvas-container {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vision-dock-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-height: 260px;
+}
+
+/* Vision Controls Panel */
+.vision-sidebar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.vision-card-section {
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border-metallic, #334155);
+  border-radius: var(--radius-xs, 4px);
+  padding: 8px 10px;
+}
+
+.vision-section-title {
+  font-family: var(--font-sans, system-ui);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-primary, #f8fafc);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vision-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+.vision-control-row:last-child {
+  margin-bottom: 0;
+}
+
+.vision-label {
+  font-family: var(--font-sans, system-ui);
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.vision-select {
+  background: var(--bg-inset, #0f172a);
+  border: 1px solid var(--border-metallic, #334155);
+  color: var(--text-primary, #f8fafc);
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  outline: none;
+}
+
+/* Snapshot Gallery Grid */
+.snapshot-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.snap-thumb-card {
+  position: relative;
+  border: 1px solid var(--border-subtle, #334155);
+  border-radius: 3px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.snap-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.snap-thumb-meta {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1px 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 8.5px;
+  color: #94a3b8;
+}
+
+.btn-snap-dl {
+  color: #38bdf8;
+  text-decoration: none;
+  font-size: 9px;
+}
+
+.gallery-empty {
+  font-family: var(--font-sans, system-ui);
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+  text-align: center;
+  padding: 8px 0;
+}

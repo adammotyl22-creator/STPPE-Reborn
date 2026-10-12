@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#111317">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RobotArm">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Robot Arm Control — Teensy 4.1</title>
+  
+  <!-- PWA Web App Manifest & App Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+
+  <!-- Favicon / Brand Icon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' fill='%2310b981'>R</text></svg>">
+
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Master & Component Stylesheets -->
+  <link rel="stylesheet" href="css/main.css">
+
+  <!-- Importmap for Browser ESM Module Resolution -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app-container">
+
+    <!-- ==================================================================== -->
+    <!-- MASTER SAFETY RIBBON & OPERATIONS BAR (50px Single Row)              -->
+    <!-- ==================================================================== -->
+    <header id="header-container" class="header-container">
+
+      <!-- LEFT: Identity & Status -->
+      <div class="header-zone-left">
+        <div class="header-brand">
+          <span class="header-brand-icon">T4</span>
+          <span class="header-brand-text" data-i18n="header.brand.title">ROBOT ARM</span>
+        </div>
+
+        <button id="status-pill" class="status-pill" type="button"
+                title="Connection Settings"
+                aria-expanded="false" aria-controls="connection-popover">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="badge_connection_status" data-connection-status class="status-pill-label">DISCONNECTED</span>
+          <span class="status-chevron">▾</span>
+        </button>
+
+        <span id="badge_homing_status" data-homing-status class="badge badge-idle" data-i18n="header.home.status.idle">IDLE</span>
+      </div>
+
+      <!-- CENTER: Homing Controls -->
+      <div class="header-zone-center">
+        <div class="homing-panel">
+          <span class="header-section-label" data-i18n="header.home.label">HOME:</span>
+          <div class="home-split-group" id="home_split_group">
+            <button class="btn-home btn-home-primary" data-home-target="ALL" data-i18n-title="tooltip.home.all" title="Home all axes (J1-J3 limit switches)" data-i18n="header.home.all">
+              <svg class="ico-home" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.5 7.5L8 2.5l5.5 5v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-6z"/>
+                <path d="M6 14.5V9h4v5.5"/>
+              </svg>
+              <span>HOME ALL</span>
+            </button>
+            <button type="button" id="btn_home_menu_trigger" class="btn-home btn-home-chevron" aria-expanded="false" aria-controls="home_dropdown_menu" title="Individual Joint Homing Options">
+              ▾
+            </button>
+            <div id="home_dropdown_menu" class="home-dropdown-menu" role="menu">
+              <div class="home-menu-header">HARDWARE SWITCHES</div>
+              <button type="button" class="home-menu-item" data-home-target="J1" title="Home Joint 1 (Base)">
+                <span class="home-menu-axis">J1</span>
+                <span class="home-menu-desc">Base Joint</span>
+              </button>
+              <button type="button" class="home-menu-item" data-home-target="J2" title="Home Joint 2 (Shoulder)">
+                <span class="home-menu-axis">J2</span>
+                <span class="home-menu-desc">Shoulder Joint</span>
+              </button>
+              <button type="button" class="home-menu-item" data-home-target="J3" title="Home Joint 3 (Elbow)">
+                <span class="home-menu-axis">J3</span>
+                <span class="home-menu-desc">Elbow Joint</span>
+              </button>
+              <div class="home-menu-divider"></div>
+              <div class="home-menu-header">ZERO REFERENCE</div>
+              <button type="button" class="home-menu-item" data-home-target="MANUAL" title="Set current pose as Home Zero">
+                <span class="home-menu-axis">SET</span>
+                <span class="home-menu-desc">Set Current as Zero</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden Gantry Jog compliance selectors -->
+        <div class="gantry-jog-hidden" style="display: none;">
+          <button data-gantry-jog="X" data-step="1"></button>
+          <button data-gantry-jog="Y" data-step="1"></button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Overrides & Safety -->
+      <div class="header-zone-right">
+        <!-- Operational Overrides -->
+        <div class="speed-override-control">
+          <span data-i18n="header.speed.label">SPEED:</span>
+          <input type="range" id="slider_speed_override" data-speed-slider class="speed-slider" min="5" max="100" value="100">
+          <span id="label_speed_val" data-speed-label class="speed-val">100%</span>
+        </div>
+
+        <div id="gamepad-status-indicator" class="gamepad-badge" title="Gamepad Teach Pendant: Disconnected">
+          <span class="gamepad-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 3.5h7.6a2.7 2.7 0 0 1 2.7 2.7v2.8a2.5 2.5 0 0 1-4.3 1.7L9 9.5H7L5.8 10.7A2.5 2.5 0 0 1 1.5 9V6.2a2.7 2.7 0 0 1 2.7-2.7z"/><line x1="4" y1="6.5" x2="6" y2="6.5"/><line x1="5" y1="5.5" x2="5" y2="7.5"/><circle cx="10.5" cy="7" r="0.7" fill="currentColor"/><circle cx="12" cy="6" r="0.7" fill="currentColor"/></svg></span>
+          <span class="gamepad-text">Gamepad</span>
+        </div>
+
+        <button id="btn_fullscreen_pendant" class="btn-pendant-toggle" data-pendant-toggle title="Toggle Fullscreen Mobile Teach Pendant" data-i18n-title="header.pwa.fullscreen" aria-label="Toggle Fullscreen Teach Pendant">
+          <span class="pendant-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5V2.5A.5.5 0 0 1 2.5 2H5M11 2h2.5a.5.5 0 0 1 .5.5V5M14 11v2.5a.5.5 0 0 1-.5.5H11M5 14H2.5a.5.5 0 0 1-.5-.5V11"/></svg></span>
+          <span class="pendant-text" data-i18n="header.pwa.fullscreen">Pendant</span>
+        </button>
+
+        <!-- Safety Divider + Isolated E-STOP Zone -->
+        <div class="header-safety-zone" id="header-safety-zone">
+          <button id="btn_reenable" data-action="reenable" class="btn-reenable"
+                  data-i18n-title="tooltip.reenable"
+                  title="Re-enable & energize stepper motors [REENABLE]"
+                  data-i18n="header.reenable">
+            <span class="reenable-label">REENABLE</span>
+          </button>
+          <button id="btn_estop" data-action="estop" class="btn-estop"
+                  aria-label="Emergency Stop"
+                  data-i18n-title="tooltip.estop"
+                  title="Emergency Stop [Esc]"
+                  data-i18n="header.estop">
+            <svg class="estop-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L1 15h14L8 1z"/><line x1="8" y1="5.5" x2="8" y2="10"/><circle cx="8" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>
+            EMERGENCY STOP
+          </button>
+        </div>
+      </div>
+
+      <!-- Connection Settings Popover (anchored below status pill, hidden by default) -->
+      <div id="connection-popover" class="connection-popover" role="dialog" aria-label="Connection Settings">
+        <div class="popover-section">
+          <span class="popover-section-label">TRANSPORT</span>
+          <div class="popover-row">
+            <div class="transport-toggle-group" data-transport-group title="Select Connection Medium: USB WebSerial or ESP32-C3 Wi-Fi Bridge">
+              <button type="button" class="btn-transport active" id="btn_transport_serial" data-transport="serial" data-i18n="header.transport.usb">USB</button>
+              <button type="button" class="btn-transport" id="btn_transport_ws" data-transport="websocket" data-i18n="header.transport.wifi">Wi-Fi</button>
+            </div>
+          </div>
+        </div>
+        <div class="popover-section">
+          <span class="popover-section-label">PARAMETERS</span>
+          <div class="popover-row">
+            <select id="select_baud_rate" data-baud-select class="baud-select" title="Serial Baud Rate">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200" selected>115200</option>
+              <option value="230400">230400</option>
+              <option value="460800">460800</option>
+              <option value="921600">921600</option>
+            </select>
+            <div class="ws-config-group" id="ws_config_group" style="display: none;">
+              <input type="text" id="input_ws_url" data-ws-url-input class="ws-url-input" value="192.168.4.1:81" placeholder="192.168.4.1:81" title="ESP32-C3 Master Bridge Host & Port" spellcheck="false">
+            </div>
+          </div>
+        </div>
+        <div class="popover-section">
+          <span class="popover-section-label">OPTIONS</span>
+          <div class="popover-row popover-row-options">
+            <label class="mock-toggle-label" data-i18n-title="tooltip.mock" title="Simulate Teensy 4.1 Virtual Hardware without USB Serial">
+              <input type="checkbox" id="check_mock_mode" data-mock-toggle>
+              <span class="mock-mode-text" data-i18n="header.mock.label">Mock</span>
+            </label>
+            <label class="auto-reconnect-label" data-i18n-title="tooltip.auto" title="Auto Reconnect if USB port disconnects">
+              <input type="checkbox" id="check_auto_reconnect" data-auto-reconnect>
+              <span class="auto-reconnect-text" data-i18n="header.auto.label">Auto</span>
+            </label>
+          </div>
+        </div>
+        <div class="popover-section">
+          <span class="popover-section-label">LANGUAGE</span>
+          <div class="popover-row">
+            <button id="btn_lang_toggle" class="btn-lang-toggle popover-lang-btn" data-lang-toggle title="Switch to Polish" data-i18n-title="header.lang.toggle.title" aria-label="Toggle language">
+              <span class="lang-flag"><svg class="ico flag-ico" viewBox="0 0 16 11" width="16" height="11"><rect width="16" height="11" fill="#1e3a8a" rx="1"/><path d="M0 0L16 11M16 0L0 11" stroke="#ffffff" stroke-width="1.8"/><path d="M0 0L16 11M16 0L0 11" stroke="#dc2626" stroke-width="0.9"/><path d="M8 0v11M0 5.5h16" stroke="#ffffff" stroke-width="3"/><path d="M8 0v11M0 5.5h16" stroke="#dc2626" stroke-width="1.6"/></svg></span>
+              <span class="lang-code" id="lang-code-label">EN</span>
+            </button>
+          </div>
+        </div>
+        <div class="popover-section popover-actions">
+          <button id="btn_serial_connect" data-action="connect-serial" class="btn btn-primary popover-connect-btn" data-i18n-title="tooltip.connect" title="Connect to Teensy 4.1" data-i18n="header.connect">
+            Connect
+          </button>
+          <span id="display_telemetry_rate" data-telemetry-rate class="popover-telem-rate" title="Live Telemetry Stream Frequency">
+            0.0 Hz
+          </span>
+        </div>
+      </div>
+
+    </header>
+
+    <!-- ==================================================================== -->
+    <!-- MAIN WORKSPACE: MODULAR 2-COLUMN DASHBOARD (Option B)                -->
+    <!-- ==================================================================== -->
+    <main id="main-workspace">
+
+      <nav class="workspace-nav" aria-label="Workspace sections">
+        <button type="button" class="workspace-nav-btn active" data-workspace-view="motion" aria-current="page" title="Motion controls">
+          <svg class="workspace-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5v15M2.5 10h15"/><circle cx="10" cy="10" r="5.2"/><circle cx="10" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
+          <span>Motion</span>
+        </button>
+        <button type="button" class="workspace-nav-btn" data-workspace-view="program" title="Sequencer and timeline">
+          <svg class="workspace-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M7 6h6M7 9h6M7 12h3M7 15h5"/></svg>
+          <span>Program</span>
+        </button>
+        <button type="button" class="workspace-nav-btn" data-workspace-view="io" title="Command terminal and camera I/O">
+          <svg class="workspace-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5h14v9H3zM6 8.5l2 1.5-2 1.5M10 12h4"/><path d="M7 3v2.5M13 3v2.5"/></svg>
+          <span>I/O</span>
+        </button>
+        <button type="button" class="workspace-nav-btn" data-workspace-view="status" title="Live telemetry and status">
+          <svg class="workspace-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5V4M3 16.5h14"/><path d="m5.5 12 3-3 2.5 2 4-5"/><circle cx="15" cy="6" r="1" fill="currentColor" stroke="none"/></svg>
+          <span>Status</span>
+        </button>
+        <button type="button" class="workspace-nav-btn" data-workspace-view="settings" title="Connection and application settings">
+          <svg class="workspace-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.2 2.8h3.6l.5 2a5.6 5.6 0 0 1 1.3.8l2-.6 1.8 3.1-1.5 1.4a5.7 5.7 0 0 1 0 1.6l1.5 1.4-1.8 3.1-2-.6a5.6 5.6 0 0 1-1.3.8l-.5 2H8.2l-.5-2a5.6 5.6 0 0 1-1.3-.8l-2 .6-1.8-3.1 1.5-1.4a5.7 5.7 0 0 1 0-1.6L2.6 8.1l1.8-3.1 2 .6a5.6 5.6 0 0 1 1.3-.8l.5-2Z"/><circle cx="10" cy="10.3" r="2.2"/></svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <!-- ================================================================== -->
+      <!-- COLUMN 1: LEFT PANEL (370px Fixed Width with Collapsible Accordion) -->
+      <!-- ================================================================== -->
+      <section id="left-panel" class="motion-view">
+        <!-- Collapsed Icon Rail (Shown when left panel is collapsed) -->
+        <div class="panel-collapsed-rail">
+          <button id="btn-left-expand" class="panel-rail-btn" data-i18n-title="panel.expand.title" title="Expand Control Panel (Alt+[)">
+            <span class="rail-icon"></span>
+            <span class="rail-text" data-i18n="panel.controls.rail">CONTROLS</span>
+            <span class="rail-chevron"></span>
+          </button>
+        </div>
+
+        <!-- Panel Header -->
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-title" data-i18n="panel.left.title">Motion control</span>
+            <span class="badge badge-cyan" data-i18n="panel.left.badge">Local</span>
+          </div>
+          <button id="btn-left-collapse" class="panel-collapse-btn" title="Collapse Left Panel (Alt+[)"></button>
+        </div>
+
+        <!-- Mode Navigation Tabs: Mutually Exclusive IK vs FK [R2] -->
+        <div class="panel-mode-tabs two-tab-rail" role="tablist" aria-label="Control Modes" style="margin: 6px 8px 0 8px;">
+          <button class="panel-mode-tab active" data-mode-tab="ik" role="tab" aria-selected="true" title="Cartesian Inverse Kinematics (IK & TCP)" data-i18n="tab.ik">Target (IK)</button>
+          <button class="panel-mode-tab" data-mode-tab="joints" role="tab" aria-selected="false" title="Direct Joint Angles & Poses (FK)" data-i18n="tab.joints">Joint Control (FK)</button>
+          <button class="panel-mode-tab tab-traj-bridge" data-mode-tab="trajectory" role="tab" aria-selected="false" title="Trajectory Studio & Sequencer" data-i18n="tab.trajectory">Sequencer</button>
+        </div>
+
+        <!-- Pulsing Direct Drive Live Status Banner (Shown when Armed) [R3] -->
+        <div class="direct-drive-banner hidden" id="banner_direct_drive_active" style="margin: 4px 8px 0 8px;">
+          <span class="pulse-beacon"></span>
+          <span class="banner-title" data-i18n="safety.direct_drive.active">DIRECT DRIVE ACTIVE</span>
+          <span class="banner-sub" data-i18n="safety.direct_drive.sub">— PHYSICAL ARM FOLLOW</span>
+        </div>
+        <!-- Alias banner ID for survey compatibility -->
+        <div id="banner_direct_drive" style="display: none;" aria-hidden="true"></div>
+
+        <!-- Inspector Content Body with Accordions -->
+        <div id="motion-panel-container" class="motion-panel accordion-container">
+
+          <!-- ============================================================== -->
+          <!-- MODE PANEL A: INVERSE KINEMATICS & TCP TARGETS (IK) [R2]       -->
+          <!-- ============================================================== -->
+          <div class="accordion-card open mode-panel-card" data-accordion="ik" id="panel_mode_ik">
+            <!-- Hidden header to satisfy any legacy querySelector('.accordion-header') -->
+            <div class="accordion-header" style="display: none;" tabindex="-1" role="button" aria-expanded="true">
+              <span class="accordion-title" data-i18n="accordion.ik.title">Inverse Kinematics (IK &amp; TCP)</span>
+            </div>
+            <div class="accordion-body mode-panel-body">
+              <!-- Streamlined Sub-Header / Toolstrip: Coordinate Frame & Mode Switch -->
+              <div class="ik-toolstrip">
+                <div class="coord-frame-group">
+                  <span class="toolstrip-label" data-i18n="ik.frame.label">FRAME:</span>
+                  <div class="step-pill-group" role="group" aria-label="Reference Frame">
+                    <button type="button" class="btn-step-pill" data-coord-frame="world" id="btn_frame_world" title="World Origin Frame" data-i18n="ik.frame.world">World</button>
+                    <button type="button" class="btn-step-pill active" data-coord-frame="base" id="btn_frame_base" title="Robot Base Frame" data-i18n="ik.frame.base">Base</button>
+                    <button type="button" class="btn-step-pill" data-coord-frame="tool" id="btn_frame_tool" title="Tool Center Point (TCP) Frame" data-i18n="ik.frame.tool">Tool</button>
+                  </div>
+                  <!-- Standard frame selector for programmatic API contract -->
+                  <select id="select_coord_frame" class="coord-frame-select hidden" aria-hidden="true" tabindex="-1">
+                    <option value="base" selected>Base</option>
+                    <option value="world">World</option>
+                    <option value="tool">Tool</option>
+                  </select>
+                </div>
+
+                <div class="mode-switch-container">
+                  <input type="checkbox" id="check_ik_cylindrical" class="mode-switch-input">
+                  <label for="check_ik_cylindrical" class="mode-switch-label" data-i18n-title="tooltip.ik.cylindrical" title="Switch between Cartesian (X/Y/Z) and Cylindrical (R/θ/Z) modes">
+                    <span class="mode-opt mode-xyz">X/Y/Z</span>
+                    <span class="mode-opt mode-rz">R/θ/Z</span>
+                    <span class="mode-switch-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- IK Step Jog Selector -->
+              <div class="step-jog-row" data-jog-category="cartesian">
+                <span class="step-jog-label" data-i18n="jog.step.label">JOG STEP:</span>
+                <div class="step-pill-group" role="group" aria-label="Cartesian Jog Step">
+                  <button type="button" class="btn-step-pill" data-cart-step="0.1">0.1 mm</button>
+                  <button type="button" class="btn-step-pill" data-cart-step="1">1 mm</button>
+                  <button type="button" class="btn-step-pill active" data-cart-step="10">10 mm</button>
+                  <button type="button" class="btn-step-pill" data-cart-step="50">50 mm</button>
+                </div>
+              </div>
+
+              <!-- Target X / R Coordinate Card -->
+              <div class="cart-axis-card axis-card-x">
+                <div class="axis-header">
+                  <div class="axis-title-wrap">
+                    <label id="label_ik_x" class="axis-label axis-label-x" data-i18n="ik.target.x">Target X (mm):</label>
+                    <span class="key-hint-badge" title="Keyboard Shortcut: Press W (Forward) / S (Backward)">W / S</span>
+                  </div>
+                  <div class="unified-jog-group">
+                    <button type="button" class="btn-jog btn-jog-minus" data-cartesian-nudge="x" data-jog-dir="-1" data-step="-10" title="Jog X -10mm [S]">−10</button>
+                    <button type="button" class="btn-jog btn-jog-plus" data-cartesian-nudge="x" data-jog-dir="1" data-step="10" title="Jog X +10mm [W]">+10</button>
+                  </div>
+                </div>
+                <div class="slider-input-row">
+                  <input type="range" id="slider_x" data-cartesian-slider="x" class="joint-slider" min="-500" max="430" step="1" value="0">
+                  <input type="number" id="input_x" data-cartesian-input="x" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="0.0">
+                </div>
+              </div>
+
+              <!-- Target Y / Theta Coordinate Card -->
+              <div class="cart-axis-card axis-card-y">
+                <div class="axis-header">
+                  <div class="axis-title-wrap">
+                    <label id="label_ik_y" class="axis-label axis-label-y" data-i18n="ik.target.y">Target Y (mm):</label>
+                    <span class="key-hint-badge" title="Keyboard Shortcut: Press A (Left) / D (Right)">A / D</span>
+                  </div>
+                  <div class="unified-jog-group">
+                    <button type="button" class="btn-jog btn-jog-minus" data-cartesian-nudge="y" data-jog-dir="-1" data-step="-10" title="Jog Y -10mm [A]">−10</button>
+                    <button type="button" class="btn-jog btn-jog-plus" data-cartesian-nudge="y" data-jog-dir="1" data-step="10" title="Jog Y +10mm [D]">+10</button>
+                  </div>
+                </div>
+                <div class="slider-input-row">
+                  <input type="range" id="slider_y" data-cartesian-slider="y" class="joint-slider" min="-500" max="385" step="1" value="0">
+                  <input type="number" id="input_y" data-cartesian-input="y" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="0.0">
+                </div>
+              </div>
+
+              <!-- Target Z Coordinate Card -->
+              <div class="cart-axis-card axis-card-z">
+                <div class="axis-header">
+                  <div class="axis-title-wrap">
+                    <label id="label_ik_z" class="axis-label axis-label-z" data-i18n="ik.target.z">Target Z (mm):</label>
+                    <span class="key-hint-badge" title="Keyboard Shortcut: Press ArrowUp (Elevate) / ArrowDown (Descend)">▲ / ▼</span>
+                  </div>
+                  <div class="unified-jog-group">
+                    <button type="button" class="btn-jog btn-jog-minus" data-cartesian-nudge="z" data-jog-dir="-1" data-step="-10" title="Jog Z -10mm [▼]">−10</button>
+                    <button type="button" class="btn-jog btn-jog-plus" data-cartesian-nudge="z" data-jog-dir="1" data-step="10" title="Jog Z +10mm [▲]">+10</button>
+                  </div>
+                </div>
+                <div class="slider-input-row">
+                  <input type="range" id="slider_z" data-cartesian-slider="z" class="joint-slider" min="-50" max="555" step="1" value="215">
+                  <input type="number" id="input_z" data-cartesian-input="z" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="215.0">
+                </div>
+              </div>
+
+              <!-- Direct Cartesian Step Keypad Matrix [R2 Mode A] -->
+              <div class="cartesian-keypad-card" id="cartesian-keypad-card">
+                <div class="keypad-header">
+                  <span class="keypad-title" data-i18n="ik.keypad.title">DIRECT STEP JOG PAD</span>
+                  <span class="keypad-step-hint" id="keypad_active_step_hint">±10mm</span>
+                </div>
+                <div class="cartesian-keypad-grid">
+                  <button type="button" class="btn-keypad btn-step-x-pos" id="btn_step_x_pos" data-cartesian-nudge="x" data-jog-dir="1" title="Jog +X (Forward) [W]">+X</button>
+                  <button type="button" class="btn-keypad btn-step-y-pos" id="btn_step_y_pos" data-cartesian-nudge="y" data-jog-dir="1" title="Jog +Y (Left) [A]">+Y</button>
+                  <button type="button" class="btn-keypad btn-step-z-pos" id="btn_step_z_pos" data-cartesian-nudge="z" data-jog-dir="1" title="Jog +Z (Up) [▲]">+Z</button>
+                  <button type="button" class="btn-keypad btn-step-x-neg" id="btn_step_x_neg" data-cartesian-nudge="x" data-jog-dir="-1" title="Jog -X (Backward) [S]">−X</button>
+                  <button type="button" class="btn-keypad btn-step-y-neg" id="btn_step_y_neg" data-cartesian-nudge="y" data-jog-dir="-1" title="Jog -Y (Right) [D]">−Y</button>
+                  <button type="button" class="btn-keypad btn-step-z-neg" id="btn_step_z_neg" data-cartesian-nudge="z" data-jog-dir="-1" title="Jog -Z (Down) [▼]">−Z</button>
+                </div>
+              </div>
+
+              <!-- Tool Orientation (6-DOF Euler R/P/YW) -->
+              <div class="orientation-controls-section" style="margin-top: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <span class="field-label" style="font-weight: 600; text-transform: uppercase; font-size: 10px; color: var(--text-muted);">Orientation (Euler)</span>
+                  <div class="step-pill-group" role="group" aria-label="Orientation Mode">
+                    <button type="button" class="btn-step-pill active" id="btn_orient_mode_6dof">6-DOF</button>
+                    <button type="button" class="btn-step-pill" id="btn_orient_mode_wrist">Preset</button>
+                  </div>
+                </div>
+
+                <div id="container_orient_6dof">
+                  <div class="cart-axis-card axis-card-r" style="border-left: 3px solid #10b981; margin-bottom: 4px;">
+                    <div class="axis-header">
+                      <span class="axis-label" data-i18n="ik.target.roll">Target Roll (°):</span>
+                      <div class="unified-jog-group">
+                        <button type="button" class="btn-jog btn-jog-minus" data-orient-nudge="roll" data-jog-dir="-1" data-step="-5">−5°</button>
+                        <button type="button" class="btn-jog btn-jog-plus" data-orient-nudge="roll" data-jog-dir="1" data-step="5">+5°</button>
+                      </div>
+                    </div>
+                    <div class="slider-input-row">
+                      <input type="range" id="slider_roll" class="joint-slider" min="-180" max="180" step="1" value="0">
+                      <input type="number" id="input_roll" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="0.0">
+                    </div>
+                  </div>
+
+                  <div class="cart-axis-card axis-card-p" style="border-left: 3px solid #f59e0b; margin-bottom: 4px;">
+                    <div class="axis-header">
+                      <span class="axis-label" data-i18n="ik.target.pitch">Target Pitch (°):</span>
+                      <div class="unified-jog-group">
+                        <button type="button" class="btn-jog btn-jog-minus" data-orient-nudge="pitch" data-jog-dir="-1" data-step="-5">−5°</button>
+                        <button type="button" class="btn-jog btn-jog-plus" data-orient-nudge="pitch" data-jog-dir="1" data-step="5">+5°</button>
+                      </div>
+                    </div>
+                    <div class="slider-input-row">
+                      <input type="range" id="slider_pitch" class="joint-slider" min="-90" max="90" step="1" value="0">
+                      <input type="number" id="input_pitch" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="0.0">
+                    </div>
+                  </div>
+
+                  <div class="cart-axis-card axis-card-yw" style="border-left: 3px solid #cbd5e1; margin-bottom: 4px;">
+                    <div class="axis-header">
+                      <span class="axis-label" data-i18n="ik.target.yaw">Target Yaw (°):</span>
+                      <div class="unified-jog-group">
+                        <button type="button" class="btn-jog btn-jog-minus" data-orient-nudge="yaw" data-jog-dir="-1" data-step="-5">−5°</button>
+                        <button type="button" class="btn-jog btn-jog-plus" data-orient-nudge="yaw" data-jog-dir="1" data-step="5">+5°</button>
+                      </div>
+                    </div>
+                    <div class="slider-input-row">
+                      <input type="range" id="slider_yaw" class="joint-slider" min="-180" max="180" step="1" value="0">
+                      <input type="number" id="input_yaw" class="joint-val-input cart-axis-input scrubbable-input" step="1" value="0.0">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Wrist Mode & Duration Section -->
+              <div class="wrist-duration-grid" id="container_wrist_mode" style="margin-top: 6px;">
+                <div>
+                  <label for="select_wrist_mode" class="field-label" data-i18n="ik.wrist.mode.label">Wrist Mode (W0-W6):</label>
+                  <select id="select_wrist_mode" data-wrist-mode-select class="baud-select wrist-mode-select">
+                    <option value="0" data-i18n="ik.wrist.w0">W0: Level (Floor Parallel)</option>
+                    <option value="1" data-i18n="ik.wrist.w1">W1: Down_0 (Vertical)</option>
+                    <option value="2" data-i18n="ik.wrist.w2">W2: Down_90 (Vertical Roll 90°)</option>
+                    <option value="3" data-i18n="ik.wrist.w3">W3: Pitch_0 (Aligned Roll 0°)</option>
+                    <option value="4" data-i18n="ik.wrist.w4">W4: Pitch_90 (Aligned Roll 90°)</option>
+                    <option value="5" data-i18n="ik.wrist.w5">W5: Pitch_180 (Aligned Roll 180°)</option>
+                    <option value="6" data-i18n="ik.wrist.w6">W6: Manual (Direct Angles)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="input_duration" class="field-label" data-i18n="ik.duration.label">Duration (ms):</label>
+                  <input type="number" id="input_duration" data-duration-input class="joint-val-input duration-input" min="100" max="30000" step="100" value="2000">
+                </div>
+              </div>
+
+              <!-- Reachability & Kinematics Safety Badge -->
+              <div class="reachability-row">
+                <span class="reachability-label" data-i18n="ik.reachability.label">Kinematics Check:</span>
+                <span id="badge_reachability" data-reachability-badge class="reachability-badge badge-safe" data-i18n="ik.reachability.valid">
+                  VALID (Reachable)
+                </span>
+              </div>
+
+              <!-- Direct Kinematic Motion Execution Buttons -->
+              <div class="motion-action-buttons">
+                <button id="btn_mov_spline" data-action="mov-spline" class="btn btn-mov-spline" data-i18n-title="tooltip.mov.spline" title="Execute Spline Move" data-i18n="ik.btn.mov">
+                  MOV (Spline)
+                </button>
+                <button id="btn_mov_linear" data-action="mov-linear" class="btn btn-mov-linear" data-i18n-title="tooltip.mov.linear" title="Execute Linear Interpolation" data-i18n="ik.btn.movl">
+                  MOVL (Linear)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================== -->
+          <!-- ============================================================== -->
+          <!-- MODE PANEL B: FORWARD KINEMATICS & JOINT CONTROLS (FK) [R1,R2] -->
+          <!-- ============================================================== -->
+          <div class="accordion-card mode-panel-card" data-accordion="joints" id="panel_mode_joints">
+            <!-- Hidden header to satisfy any legacy querySelector('.accordion-header') -->
+            <div class="accordion-header" style="display: none;" tabindex="-1" role="button" aria-expanded="false">
+              <span class="accordion-title" data-i18n="accordion.joints.title">Joint Angle Controls (FK &amp; Gripper)</span>
+            </div>
+            <div class="accordion-body mode-panel-body">
+              <!-- Joint Step Jog Selector -->
+              <div class="step-jog-row" data-jog-category="joint">
+                <span class="step-jog-label" data-i18n="jog.step.joint.label">JOG STEP:</span>
+                <div class="step-pill-group" role="group" aria-label="Joint Jog Step">
+                  <button type="button" class="btn-step-pill" data-joint-step="0.1">0.1°</button>
+                  <button type="button" class="btn-step-pill active" data-joint-step="1">1°</button>
+                  <button type="button" class="btn-step-pill" data-joint-step="5">5°</button>
+                  <button type="button" class="btn-step-pill" data-joint-step="10">10°</button>
+                  <button type="button" class="btn-step-pill" data-joint-step="45">45°</button>
+                </div>
+              </div>
+
+              <!-- 6 High-Density Single-Row Joint Cards (J1–J6) [R1] -->
+              <div class="joint-cards-stack">
+                <!-- J1: Base Rotation -->
+                <div class="joint-card-row" data-joint-card="j1">
+                  <div class="joint-id-badge" title="J1 Base Rotation [-90° .. +90°]"><span class="joint-id-name">J1</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j1" data-jog-dir="-1" data-step="-1" title="Jog J1 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j1" data-joint-slider="j1" class="joint-slider joint-slider-dense" min="-90" max="90" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j1" data-jog-dir="1" data-step="1" title="Jog J1 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j1" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j1" data-joint-val="j1" class="joint-val-input scrubbable-input joint-badge-input" min="-90" max="90" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+
+                <!-- J2: Shoulder Elevation -->
+                <div class="joint-card-row" data-joint-card="j2">
+                  <div class="joint-id-badge" title="J2 Shoulder Elevation [-65° .. +115°]"><span class="joint-id-name">J2</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j2" data-jog-dir="-1" data-step="-1" title="Jog J2 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j2" data-joint-slider="j2" class="joint-slider joint-slider-dense" min="-65" max="115" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j2" data-jog-dir="1" data-step="1" title="Jog J2 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j2" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j2" data-joint-val="j2" class="joint-val-input scrubbable-input joint-badge-input" min="-65" max="115" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+
+                <!-- J3: Elbow Flexion -->
+                <div class="joint-card-row" data-joint-card="j3">
+                  <div class="joint-id-badge" title="J3 Elbow Flexion [-35° .. +170°]"><span class="joint-id-name">J3</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j3" data-jog-dir="-1" data-step="-1" title="Jog J3 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j3" data-joint-slider="j3" class="joint-slider joint-slider-dense" min="-35" max="170" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j3" data-jog-dir="1" data-step="1" title="Jog J3 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j3" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j3" data-joint-val="j3" class="joint-val-input scrubbable-input joint-badge-input" min="-35" max="170" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+
+                <!-- J4: Forearm Roll -->
+                <div class="joint-card-row" data-joint-card="j4">
+                  <div class="joint-id-badge" title="J4 Forearm Roll [-90° .. +90°]"><span class="joint-id-name">J4</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j4" data-jog-dir="-1" data-step="-1" title="Jog J4 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j4" data-joint-slider="j4" class="joint-slider joint-slider-dense" min="-90" max="90" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j4" data-jog-dir="1" data-step="1" title="Jog J4 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j4" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j4" data-joint-val="j4" class="joint-val-input scrubbable-input joint-badge-input" min="-90" max="90" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+
+                <!-- J5: Wrist Pitch -->
+                <div class="joint-card-row" data-joint-card="j5">
+                  <div class="joint-id-badge" title="J5 Wrist Pitch [-90° .. +90°]"><span class="joint-id-name">J5</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j5" data-jog-dir="-1" data-step="-1" title="Jog J5 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j5" data-joint-slider="j5" class="joint-slider joint-slider-dense" min="-90" max="90" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j5" data-jog-dir="1" data-step="1" title="Jog J5 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j5" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j5" data-joint-val="j5" class="joint-val-input scrubbable-input joint-badge-input" min="-90" max="90" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+
+                <!-- J6: Tool Roll -->
+                <div class="joint-card-row" data-joint-card="j6">
+                  <div class="joint-id-badge" title="J6 Tool Roll [-180° .. +180°]"><span class="joint-id-name">J6</span></div>
+                  <button type="button" class="btn-jog btn-jog-minus tactile-step-btn" data-nudge-joint="j6" data-jog-dir="-1" data-step="-1" title="Jog J6 -1° [Hold to accelerate]">−</button>
+                  <div class="joint-track-wrap">
+                    <div class="joint-limit-track" aria-hidden="true"></div>
+                    <input type="range" id="slider_j6" data-joint-slider="j6" class="joint-slider joint-slider-dense" min="-180" max="180" step="0.1" value="0">
+                  </div>
+                  <button type="button" class="btn-jog btn-jog-plus tactile-step-btn" data-nudge-joint="j6" data-jog-dir="1" data-step="1" title="Jog J6 +1° [Hold to accelerate]">+</button>
+                  <div class="joint-badge-wrap" data-joint="j6" title="Click to edit angle. Press Enter to commit.">
+                    <input type="number" id="val_j6" data-joint-val="j6" class="joint-val-input scrubbable-input joint-badge-input" min="-180" max="180" step="0.1" value="0.0">
+                    <span class="joint-val-unit">°</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Pose Presets Card [R2 Mode B] -->
+              <div class="quick-pose-card" id="quick_pose_card" style="margin-top: 8px;">
+                <div class="quick-pose-header">
+                  <span class="quick-pose-title" data-i18n="preset.quick.title">QUICK POSE PRESETS</span>
+                  <span class="quick-pose-hint" data-i18n="preset.quick.hint">1-CLICK TARGET</span>
+                </div>
+                <div class="quick-pose-grid">
+                  <button type="button" class="btn btn-preset" id="btn_preset_home" data-pose-preset="home" data-i18n-title="tooltip.preset.home" title="Home: J1..J6 = [0, 25, 140, 0, 0, 0]">
+                    <span class="preset-name" data-i18n="preset.pose.home">Home Pose</span>
+                    <span class="preset-coords">[0, 25, 140, 0, 0, 0]</span>
+                  </button>
+                  <button type="button" class="btn btn-preset" id="btn_preset_zero" data-pose-preset="zero" data-i18n-title="tooltip.preset.zero" title="Zero All: All axes 0.0°">
+                    <span class="preset-name" data-i18n="preset.pose.zero">Zero All</span>
+                    <span class="preset-coords">[All 0.0°]</span>
+                  </button>
+                  <button type="button" class="btn btn-preset" id="btn_preset_ready" data-pose-preset="ready" data-i18n-title="tooltip.preset.ready" title="Ready: Operational work pose [0, -30, 90, 0, 30, 0]">
+                    <span class="preset-name" data-i18n="preset.pose.ready">Ready</span>
+                    <span class="preset-coords">[0, -30, 90, 0, 30, 0]</span>
+                  </button>
+                  <button type="button" class="btn btn-preset" id="btn_preset_stow" data-pose-preset="stow" data-i18n-title="tooltip.preset.stow" title="Stow: Safe compact park pose [0, -75, 160, 0, -85, 0]">
+                    <span class="preset-name" data-i18n="preset.pose.stow">Stow</span>
+                    <span class="preset-coords">[0, -75, 160, 0, -85, 0]</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================== -->
+          <!-- ACCORDION CARD 3: TRAJECTORY STUDIO & SEQUENCER                 -->
+          <!-- ============================================================== -->
+          <div class="accordion-card" data-accordion="trajectory">
+            <div class="accordion-header" tabindex="0" role="button" aria-expanded="false">
+              <div class="accordion-title-group">
+                <span class="accordion-icon"></span>
+                <span class="accordion-title" data-i18n="accordion.trajectory.title">Trajectory &amp; Sequencer</span>
+                <span class="badge badge-amber">Sequencer</span>
+              </div>
+              <div class="accordion-header-actions">
+                <span class="accordion-chevron"></span>
+              </div>
+            </div>
+            <div class="accordion-body">
+              <div id="trajectory-container">
+                <!-- Rendered dynamically by TrajectoryController -->
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================== -->
+          <!-- ACCORDION CARD 4: MOTION ENGINE & BACKLASH COMPENSATION        -->
+          <!-- ============================================================== -->
+          <div class="accordion-card" data-accordion="motion-engine" id="card-motion-engine">
+            <div class="accordion-header" tabindex="0" role="button" aria-expanded="false">
+              <div class="accordion-title-group">
+                <span class="accordion-icon">⚙</span>
+                <span class="accordion-title" data-i18n="accordion.backlash.title">Motion Engine &amp; Backlash</span>
+                <span class="badge badge-emerald">Teensy 4.1 v3.2</span>
+              </div>
+              <div class="accordion-header-actions">
+                <span class="accordion-chevron"></span>
+              </div>
+            </div>
+            <div class="accordion-body">
+              <!-- Firmware Feature Status Grid -->
+              <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px;">
+                <span class="badge badge-emerald" title="6-DOF Analytical Inverse Kinematics with Spherical Wrist Decoupling">6-DOF Analytical IK</span>
+                <span class="badge badge-cyan" title="Continuous Corner Blending with Quintic Hermite C2 Splines">C² Corner Blending</span>
+                <span class="badge badge-amber" title="Singularity Dampening for Wrist collinearity &amp; Maximum Reach">Singularity DLS</span>
+                <span class="badge badge-purple" title="TMC2209 Steppers on J1-J6 + PWM Gripper Servo on Pin 21">6x TMC2209 Steppers</span>
+              </div>
+
+              <!-- Software Backlash Compensation Section -->
+              <div style="border-top: 1px solid var(--border-metallic, rgba(255,255,255,0.08)); padding-top: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.4px;">Software Backlash (EEPROM 2048)</span>
+                  <div style="display: flex; gap: 4px;">
+                    <button type="button" class="btn btn-xs btn-secondary" id="btn_backlash_query" title="Query backlash values from Teensy via BACKLASH command">Query</button>
+                    <button type="button" class="btn btn-xs btn-primary" id="btn_backlash_save" title="Save backlash settings to Teensy EEPROM">Save All</button>
+                  </div>
+                </div>
+
+                <!-- Backlash Inputs for J1..J6 -->
+                <div class="backlash-grid" style="display: flex; flex-direction: column; gap: 6px;">
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J1 (Base):</span>
+                    <input type="range" id="slider_backlash_j1" class="joint-slider" min="0" max="2.0" step="0.05" value="0.25" style="flex: 1;">
+                    <input type="number" id="input_backlash_j1" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.25" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J2 (Shoulder):</span>
+                    <input type="range" id="slider_backlash_j2" class="joint-slider" min="0" max="2.0" step="0.05" value="0.40" style="flex: 1;">
+                    <input type="number" id="input_backlash_j2" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.40" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J3 (Elbow):</span>
+                    <input type="range" id="slider_backlash_j3" class="joint-slider" min="0" max="2.0" step="0.05" value="0.40" style="flex: 1;">
+                    <input type="number" id="input_backlash_j3" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.40" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J4 (Forearm):</span>
+                    <input type="range" id="slider_backlash_j4" class="joint-slider" min="0" max="2.0" step="0.05" value="0.20" style="flex: 1;">
+                    <input type="number" id="input_backlash_j4" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.20" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J5 (Pitch):</span>
+                    <input type="range" id="slider_backlash_j5" class="joint-slider" min="0" max="2.0" step="0.05" value="0.20" style="flex: 1;">
+                    <input type="number" id="input_backlash_j5" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.20" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                  <div class="backlash-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); width: 85px;">J6 (Roll):</span>
+                    <input type="range" id="slider_backlash_j6" class="joint-slider" min="0" max="2.0" step="0.05" value="0.20" style="flex: 1;">
+                    <input type="number" id="input_backlash_j6" class="joint-val-input" min="0" max="5.0" step="0.05" value="0.20" style="width: 55px; text-align: center;">
+                    <span style="font-size: 10px; color: var(--text-muted); width: 14px;">°</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <section class="settings-panel-content" id="settings-panel-content" aria-label="Execution settings">
+          <div class="settings-panel-heading">
+            <h2>Execution &amp; Safety</h2>
+            <button type="button" class="btn btn-secondary" id="btn-settings-connection">Connection settings</button>
+          </div>
+          <label class="mobile-optimization-row" for="toggle-mobile-optimizations">
+            <span>Mobile Optimizations</span>
+            <span class="settings-switch">
+              <input type="checkbox" id="toggle-mobile-optimizations" role="switch" aria-label="Mobile Optimizations">
+              <span class="settings-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <div class="safety-execution-bar" id="safety_execution_bar">
+            <div class="safety-mode-strip">
+              <span class="safety-strip-title" data-i18n="safety.execution.title">Safety Mode</span>
+              <div class="safety-mode-labels">
+                <span class="mode-state-tag state-safe active" id="label_mode_preview" data-i18n="safety.mode.preview">PREVIEW (GHOST)</span>
+                <span class="mode-state-tag state-live" id="label_mode_live" data-i18n="safety.mode.live">LIVE FOLLOW</span>
+              </div>
+              <label class="toggle-control direct-drive-toggle" data-i18n-title="tooltip.direct_drive.toggle" title="Toggle Physical Direct Drive Arm Follow (Confirmation Required)">
+                <input type="checkbox" id="toggle_direct_drive" data-auto-send-toggle>
+                <span class="toggle-label" id="label_direct_drive_state" data-i18n="safety.direct_drive.toggle">Direct Drive</span>
+              </label>
+              <input type="checkbox" id="check_direct_drive_mode" style="display: none;" aria-hidden="true">
+              <input type="checkbox" id="check_joints_autosend" data-auto-send-toggle style="display: none;" aria-hidden="true">
+              <input type="checkbox" id="check_ik_autosend" data-auto-send-toggle style="display: none;" aria-hidden="true">
+            </div>
+
+            <div class="safety-action-buttons">
+              <button type="button" id="btn_send_ghost" data-action="send-ghost" class="btn btn-ptp-send" data-i18n-title="tooltip.btn.ptp" title="Execute Point-to-Point trajectory to Ghost Target">
+                <span class="btn-ico">⚡</span> <span data-i18n="safety.btn.ptp">Send to Target (PTP)</span>
+              </button>
+              <button type="button" id="btn_plan_trajectory" data-action="plan-trajectory" class="btn btn-plan-traj" data-i18n-title="tooltip.btn.plan" title="Compute collision-free trajectory to target and preview in 3D viewport">
+                <span class="btn-ico">📐</span> <span data-i18n="safety.btn.plan">Plan Trajectory</span>
+              </button>
+            </div>
+
+            <div class="safety-sync-subrow" style="display: flex; gap: 4px; margin-top: 2px;">
+              <button type="button" id="btn_ghost_to_live" data-action="ghost-to-live" class="btn btn-xs btn-secondary btn-icon-only" data-i18n-title="tooltip.ghost.from.live" title="Copy Live Robot Pose to Ghost Target">
+                <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3m0 0 3-3m-3 3 3 3"/></svg>
+                <span class="visually-hidden" data-i18n="ik.btn.ghost.from.live">Ghost ← Live</span>
+              </button>
+              <button type="button" id="btn_sync_live_joints" data-action="sync-live-to-joints" class="btn btn-xs btn-secondary" data-i18n-title="tooltip.get.live" title="Copy Live Robot Pose to Sliders" data-i18n="joint.btn.get.live" style="display: none;">
+                Get Live
+              </button>
+              <button type="button" id="btn_send_joints_robot" data-action="send-joints-robot" class="btn btn-xs btn-primary" data-i18n-title="tooltip.send.joints" title="Send Joint Sliders Target to Robot" data-i18n="joint.btn.send" style="display: none;">
+                Send to Robot
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================== -->
+        <!-- DOCKED FOOTER: PERSISTENT GRIPPER                                  -->
+        <!-- ==================================================================== -->
+        <div class="left-panel-docked-footer">
+          <!-- Dedicated Persistent Gripper / End-Effector Card [R4] -->
+          <div class="persistent-gripper-card" id="persistent-gripper-card">
+            <div class="gripper-card-header">
+              <div class="gripper-title-group">
+                <span class="gripper-icon">🗜️</span>
+                <span class="gripper-title" data-i18n="gripper.card.title">END-EFFECTOR (GRIPPER)</span>
+              </div>
+              <div class="gripper-telemetry-badge" id="gripper_telemetry_badge">
+                <span id="gripper_badge_text">LOAD: 0%</span>
+              </div>
+            </div>
+
+            <!-- Direct Visual Percentage Slider Row (0% to 100%) -->
+            <div class="gripper-slider-row">
+              <span class="gripper-axis-label" data-i18n="gripper.span.label">SPAN:</span>
+              <div class="gripper-track-wrap">
+                <input type="range" id="slider_grip" data-joint-slider="grip" class="joint-slider gripper-slider" min="0" max="100" step="1" value="0">
+              </div>
+              <div class="gripper-badge-wrap">
+                <input type="number" id="val_grip" data-joint-val="grip" class="joint-val-input gripper-val-input scrubbable-input" min="0" max="100" step="1" value="0">
+                <span class="gripper-unit">%</span>
+              </div>
+            </div>
+
+            <!-- Quick Macro Buttons (Open 100%, Half 50%, Close 0%) -->
+            <div class="gripper-macro-bar">
+              <button type="button" class="btn btn-macro" data-grip-macro="open" data-i18n="joint.grip.open">Open (100%)</button>
+              <button type="button" class="btn btn-macro" data-grip-macro="half" data-i18n="joint.grip.half">Half (50%)</button>
+              <button type="button" class="btn btn-macro" data-grip-macro="close" data-i18n="joint.grip.close">Close (0%)</button>
+            </div>
+
+            <!-- Real-Time Telemetry Status Strip -->
+            <div class="gripper-telemetry-strip" id="gripper_telemetry_strip">
+              <div class="telem-strip-col">
+                <span class="strip-label" data-i18n="gripper.telem.state">STATE:</span>
+                <span class="strip-val" id="gripper_status_state" data-i18n="gripper.status.ready">READY</span>
+              </div>
+              <div class="telem-strip-col">
+                <span class="strip-label" data-i18n="gripper.telem.effort">EFFORT:</span>
+                <span class="strip-val" id="gripper_status_effort">0 mA</span>
+              </div>
+              <div class="telem-strip-col">
+                <span class="strip-label" data-i18n="gripper.telem.object">OBJECT:</span>
+                <span class="strip-val" id="gripper_status_object" data-i18n="gripper.status.clear">CLEAR</span>
+              </div>
+            </div>
+          </div>
+          <!-- Persistent gripper card alias ID for survey compatibility -->
+          <div id="persistent_gripper_card" style="display: none;" aria-hidden="true"></div>
+        </div>
+        <section id="right-panel" style="display: none;" aria-hidden="true">
+          <div class="panel-collapsed-rail">
+            <button id="btn-right-expand" class="panel-rail-btn"><span>Expand</span></button>
+          </div>
+          <div class="panel-header">
+            <button id="btn-right-collapse" class="panel-collapse-btn"><span>Collapse</span></button>
+          </div>
+        </section>
+      </section>
+
+      <!-- ================================================================== -->
+      <!-- COLUMN 2: RIGHT COLUMN (Maximized 3D Viewport + Collapsible Dock)   -->
+      <!-- ================================================================== -->
+      <section id="right-column" class="right-column">
+
+        <!-- Central 3D Kinematics Viewport Section -->
+        <section id="center-panel" class="viewport-panel">
+          <div id="viewport-container" class="viewport-container">
+            <!-- Unified Glass HUD Ribbon (Top Consolidated Toolbar) -->
+            <div id="unified-glass-ribbon" class="unified-glass-ribbon">
+              <!-- Left: Coordinates & Pose HUD -->
+              <div class="ribbon-section">
+                <div id="viewport-hud" class="viewport-hud-ribbon" style="display: flex; gap: 6px; align-items: center;">
+                  <div class="hud-pill">
+                    <span class="hud-pill-label" data-i18n="hud.tcp.pose">TCP</span>
+                    <div class="hud-coords">
+                      <span class="hud-coord-item"><span class="dim">X:</span> <span id="hud-tcp-x" class="val">0.0</span></span>
+                      <span class="hud-coord-item"><span class="dim">Y:</span> <span id="hud-tcp-y" class="val">0.0</span></span>
+                      <span class="hud-coord-item"><span class="dim">Z:</span> <span id="hud-tcp-z" class="val">215.0</span></span>
+                      <span class="hud-coord-item"><span class="dim">R:</span> <span id="hud-tcp-r" class="val">0.0°</span></span>
+                      <span class="hud-coord-item"><span class="dim">P:</span> <span id="hud-tcp-p" class="val">0.0°</span></span>
+                      <span class="hud-coord-item"><span class="dim">YW:</span> <span id="hud-tcp-yw" class="val">0.0°</span></span>
+                    </div>
+                  </div>
+
+                  <div id="hud-floor-alert" class="hud-alert-indicator hud-alert-ok" style="display: none;" data-i18n="hud.floor.ok">
+                    OK (>20mm)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Center: Camera Presets Bar -->
+              <div class="ribbon-section">
+                <div class="camera-toolbar">
+                  <button class="camera-btn active" data-camera-preset="isometric" data-i18n-title="tooltip.camera.isometric" title="Isometric View [1]">
+                    <span data-i18n="camera.isometric">Iso</span> <span class="key-hint">1</span>
+                  </button>
+                  <button class="camera-btn" data-camera-preset="top" data-i18n-title="tooltip.camera.top" title="Top View XY [2]">
+                    <span data-i18n="camera.top">Top</span> <span class="key-hint">2</span>
+                  </button>
+                  <button class="camera-btn" data-camera-preset="front" data-i18n-title="tooltip.camera.front" title="Front View XZ [3]">
+                    <span data-i18n="camera.front">Front</span> <span class="key-hint">3</span>
+                  </button>
+                  <button class="camera-btn" data-camera-preset="side" data-i18n-title="tooltip.camera.side" title="Side View YZ [4]">
+                    <span data-i18n="camera.side">Side</span> <span class="key-hint">4</span>
+                  </button>
+                  <button class="camera-btn" data-camera-preset="reset" data-i18n-title="tooltip.camera.reset" title="Reset Camera [5]">
+                    <span data-i18n="camera.reset">Reset</span> <span class="key-hint">5</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating / Dockable Eye-in-Hand Camera HUD Widget -->
+            <div id="camera-hud-container" class="camera-hud-overlay camera-hud-docked camera-hud-minimized">
+              <div class="camera-hud-header" id="camera-hud-header">
+                <div class="camera-hud-title-group">
+                  <span class="camera-hud-title" data-i18n="camera.hud.title">J5 Eye-in-Hand Vision</span>
+                  <span class="badge badge-slate" data-camera-status-badge>STANDBY</span>
+                </div>
+                <div class="camera-hud-header-actions">
+                  <button class="hud-control-btn" id="btn-camera-pip-dock" title="Dock / Undock Corner PIP"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="11" x2="8" y2="15"/><path d="M3.5 11h9l-1.5-2V4.5h.75a1 1 0 0 0 0-2H4.25a1 1 0 0 0 0 2H5V9l-1.5 2z"/></svg></button>
+                  <button class="hud-control-btn" id="btn-camera-pip-min" title="Minimize to Thumbnail Badge">—</button>
+                  <button class="hud-control-btn" id="btn-camera-toggle-stream" data-camera-toggle-btn title="Start / Stop Stream">Start</button>
+                  <button class="hud-control-btn" id="btn-camera-pip-close" title="Close Camera PIP">✕</button>
+                </div>
+              </div>
+              <div class="camera-pip-canvas-wrap">
+                <canvas id="camera-pip-canvas" class="camera-feed-canvas" width="640" height="360"></canvas>
+              </div>
+              <div class="camera-pip-toolbar">
+                <div class="camera-action-group">
+                  <button class="btn-cam-action" id="btn-camera-snapshot" title="Capture Snapshot">Snap</button>
+                  <button class="btn-cam-action" id="btn-camera-rotate" title="Rotate 90°">Rot 90°</button>
+                  <button class="btn-cam-action" id="btn-camera-fliph" title="Flip Horizontal">Flip H</button>
+                  <button class="btn-cam-action" id="btn-camera-flipv" title="Flip Vertical">Flip V</button>
+                </div>
+                <div class="camera-action-group">
+                  <span class="badge badge-slate" data-camera-fps style="font-size: 9px; padding: 2px 5px;">0 FPS</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Minimized Camera PiP Badge -->
+            <div id="camera-pip-minimized-badge" class="camera-pip-min-badge" title="Eye-in-Hand Camera Minimized — Click to Restore">
+              <span class="cam-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="9" height="8" rx="1"/><polygon points="11,6 15,4 15,12 11,10"/></svg></span>
+              <span class="cam-badge-text">J5 Camera</span>
+              <span class="badge badge-slate" data-camera-status-badge>STANDBY</span>
+            </div>
+
+            <!-- 3D WebGL Canvas Wrapper -->
+            <div id="visualizer-canvas-wrapper" class="viewport-canvas-wrapper"></div>
+
+            <!-- Floating Bottom Bar: Layers & Dual-Arm Legend -->
+            <div class="viewport-bottom-bar">
+              <!-- Dual Arm Legend -->
+              <div class="dual-arm-legend">
+                <div class="legend-item">
+                  <span class="legend-dot live"></span>
+                  <span data-i18n="legend.live">Live Arm (Titanium)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot ghost"></span>
+                  <span data-i18n="legend.ghost">Ghost Target (Amber)</span>
+                </div>
+              </div>
+
+              <!-- Viewport Vision & Layer Controls Popover Menu -->
+              <div class="viewport-vision-menu" id="viewport-vision-menu">
+                <button type="button" id="btn-viewport-vision" class="btn-viewport-vision" data-i18n-title="tooltip.viewport.vision" title="Manage Viewport Vision & Layer Toggles" aria-expanded="false" aria-haspopup="true">
+                  <span class="vision-btn-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5S1 8 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>
+                  <span class="vision-btn-text" data-i18n="viewport.vision.btn">Vision</span>
+                  <span class="vision-btn-chevron">▴</span>
+                </button>
+
+                <div id="viewport-vision-popover" class="viewport-vision-popover hidden" role="menu" aria-label="Vision & Layers">
+                  <div class="vision-popover-header">
+                    <div class="vision-header-title-group">
+                      <span class="vision-header-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5S1 8 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>
+                      <span class="vision-popover-title" data-i18n="viewport.vision.title">Vision & Layers</span>
+                    </div>
+                    <button type="button" class="btn-vision-popover-close" id="btn-vision-popover-close" title="Close">✕</button>
+                  </div>
+                  <div class="vision-popover-body">
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.camera.pip" title="Toggle Floating J5 Eye-in-Hand Camera HUD">
+                      <input type="checkbox" id="chk-camera-pip-toggle" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="9" height="8" rx="1"/><polygon points="11,6 15,4 15,12 11,10"/></svg></span>
+                      <span class="toggle-text" data-i18n="camera.layer.pip">Camera HUD</span>
+                    </label>
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.ghost.visible" title="Toggle Ghost Arm">
+                      <input type="checkbox" id="chk-ghost-visible" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 14V7a4 4 0 0 1 8 0v7l-1.5-2-1.5 2-1.5-2L6 14l-1-2z"/><circle cx="6.5" cy="7" r="1" fill="currentColor"/><circle cx="9.5" cy="7" r="1" fill="currentColor"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.ghost">Ghost</span>
+                    </label>
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.path.visible" title="Toggle 3D Trajectory Toolpath Spline & Waypoints">
+                      <input type="checkbox" id="chk-path-visible" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2 10c2-4 4 4 6 0s4-4 6 0"/><circle cx="2" cy="10" r="1.5" fill="currentColor"/><circle cx="14" cy="10" r="1.5" fill="currentColor"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.path">Path</span>
+                    </label>
+                    <label class="vision-toggle-item" title="Toggle translucent maximum arm reach envelope">
+                      <input type="checkbox" id="chk-reach-envelope-visible">
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="8" cy="8" r="6"/><ellipse cx="8" cy="8" rx="2.5" ry="6"/><path d="M2.2 6h11.6M2.2 10h11.6"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.reach">Reach Envelope</span>
+                    </label>
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.floor.alert" title="Toggle Floor Clearance Alert Plane (Z=20mm)">
+                      <input type="checkbox" id="chk-floor-alert-visible" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 12 8 8l7 4"/><path d="M1 12l7 4 7-4"/><line x1="8" y1="2" x2="8" y2="8" stroke-dasharray="2 1.5"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.floor">Floor Plane</span>
+                    </label>
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.exclusion" title="Toggle Base Exclusion Warning Cylinder (R=80mm)">
+                      <input type="checkbox" id="chk-exclusion-visible" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><ellipse cx="8" cy="4" rx="5" ry="2"/><path d="M3 4v8c0 1.1 2.24 2 5 2s5-.9 5-2V4"/><line x1="5" y1="6" x2="11" y2="12" stroke-width="1.5"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.exclusion">Base Cyl</span>
+                    </label>
+                    <label class="vision-toggle-item" data-i18n-title="tooltip.grid" title="Toggle Floor Grid">
+                      <input type="checkbox" id="chk-grid-visible" checked>
+                      <span class="toggle-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="1" width="14" height="14" rx="1"/><line x1="1" y1="5.67" x2="15" y2="5.67"/><line x1="1" y1="10.33" x2="15" y2="10.33"/><line x1="5.67" y1="1" x2="5.67" y2="15"/><line x1="10.33" y1="1" x2="10.33" y2="15"/></svg></span>
+                      <span class="toggle-text" data-i18n="layer.grid">Grid</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- COLLAPSIBLE BOTTOM DOCK DRAWER (Telemetry & Terminal Sub-Panels) -->
+        <!-- ================================================================ -->
+        <footer id="bottom-dock" class="dock-expanded">
+          <!-- Dock Tab Navigation Bar -->
+          <div class="dock-header">
+            <div class="dock-tabs">
+              <button class="dock-tab-btn active" data-dock-tab="split" title="View Telemetry Charts and Terminal side-by-side" data-i18n="dock.tab.split">
+                <span data-i18n="dock.tab.split">Split View</span>
+              </button>
+              <button class="dock-tab-btn" data-dock-tab="telemetry" title="View Real-Time Telemetry Strip Charts & Status HUD" data-i18n="dock.tab.telemetry">
+                <span data-i18n="dock.tab.telemetry">Telemetry Charts & HUD</span>
+              </button>
+              <button class="dock-tab-btn" data-dock-tab="console" title="View Interactive Serial Command Terminal & Logs" data-i18n="dock.tab.console">
+                <span data-i18n="dock.tab.console">Command Terminal & Logs</span>
+              </button>
+              <button class="dock-tab-btn" data-dock-tab="vision" id="dock-tab-vision" title="Full Eye-in-Hand Camera & Vision Studio" data-i18n="camera.tab.title">
+                <span data-i18n="camera.tab.title">Vision & Camera</span>
+              </button>
+              <button class="dock-tab-btn" data-dock-tab="timeline" id="dock-tab-timeline" title="Horizontal Waypoint Timeline & Keyframe Track" data-i18n="dock.tab.timeline">
+                <span class="timeline-tab-icon"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/><circle cx="5" cy="4" r="1.5" fill="currentColor"/><circle cx="9" cy="8" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg></span> <span data-i18n="dock.tab.timeline">Timeline</span>
+              </button>
+            </div>
+
+            <div class="dock-actions">
+              <button id="btn-dock-toggle" class="dock-toggle-btn" data-i18n-title="tooltip.dock.toggle" title="Toggle Dock Collapse / Expand (\)" data-i18n="dock.collapse">
+                Collapse Dock
+              </button>
+            </div>
+          </div>
+
+          <!-- Dock Content Panels -->
+          <div class="dock-content-wrapper">
+            <!-- Tab 1: Split View (Both Telemetry & Console Side-by-Side) -->
+            <div id="dock-view-split" class="dock-view-split active">
+              <div class="split-left">
+                <div id="telemetry-split-container" style="height: 100%; width: 100%;"></div>
+              </div>
+              <div class="split-right">
+                <div id="console-split-container" style="height: 100%; width: 100%;"></div>
+              </div>
+            </div>
+
+            <!-- Tab 2: Full Telemetry View -->
+            <div id="dock-view-telemetry" class="dock-view-pane">
+              <div id="telemetry-full-container" style="height: 100%; width: 100%;"></div>
+            </div>
+
+            <!-- Tab 3: Full Console View -->
+            <div id="dock-view-console" class="dock-view-pane">
+              <div id="console-full-container" style="height: 100%; width: 100%;"></div>
+            </div>
+
+            <!-- Tab 4: Full Vision & Camera Studio -->
+            <div id="dock-view-vision" class="dock-view-pane">
+              <div id="vision-split-container" class="vision-dock-layout" style="height: 100%; width: 100%;">
+                <div class="vision-main-viewport">
+                  <div class="vision-viewport-header">
+                    <div class="camera-hud-title-group">
+                      <span class="camera-hud-title">J5 Eye-in-Hand High-Res Feed</span>
+                      <span class="badge badge-slate" data-camera-status-badge>STANDBY</span>
+                    </div>
+                    <div class="camera-action-group">
+                      <button class="btn btn-xs btn-primary" data-camera-toggle-btn>Start Stream</button>
+                      <button class="btn btn-xs btn-secondary" id="btn-dock-cam-snap">Snap Photo</button>
+                    </div>
+                  </div>
+                  <div class="vision-canvas-container">
+                    <canvas id="camera-dock-canvas" class="vision-dock-canvas" width="1280" height="720"></canvas>
+                  </div>
+                </div>
+
+                <div class="vision-sidebar-controls">
+                  <!-- Device & Stream Configuration -->
+                  <div class="vision-card-section">
+                    <div class="vision-section-title">
+                      <span>Camera Hardware</span>
+                      <span class="badge badge-cyan" data-camera-fps>0 FPS</span>
+                    </div>
+                    <div class="vision-control-row">
+                      <span class="vision-label">Device:</span>
+                      <select class="vision-select" data-camera-device-select style="max-width: 170px;">
+                        <option value="">USB Camera (Default)</option>
+                      </select>
+                    </div>
+                    <div class="vision-control-row">
+                      <span class="vision-label">Resolution:</span>
+                      <select class="vision-select" data-camera-res-select>
+                        <option value="1280x720" selected>1280x720 (720p HD)</option>
+                        <option value="1920x1080">1920x1080 (1080p FHD)</option>
+                        <option value="640x480">640x480 (VGA Fast)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Optical Reticle & Overlays -->
+                  <div class="vision-card-section">
+                    <div class="vision-section-title">Reticle &amp; Alignment</div>
+                    <div class="vision-control-row">
+                      <label class="toggle-control">
+                        <input type="checkbox" id="chk-camera-reticle" checked>
+                        <span class="toggle-label">TCP Crosshair Reticle</span>
+                      </label>
+                    </div>
+                    <div class="vision-control-row">
+                      <label class="toggle-control">
+                        <input type="checkbox" id="chk-camera-gripper-guides" checked>
+                        <span class="toggle-label">Dynamic Gripper Jaw Span</span>
+                      </label>
+                    </div>
+                    <div class="vision-control-row">
+                      <label class="toggle-control">
+                        <input type="checkbox" id="chk-camera-concentric-rings" checked>
+                        <span class="toggle-label">Millimeter Scale Rings (10-50mm)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Color Blob Tracking -->
+                  <div class="vision-card-section">
+                    <div class="vision-section-title">Computer Vision Assist</div>
+                    <div class="vision-control-row">
+                      <label class="toggle-control">
+                        <input type="checkbox" id="chk-camera-color-track">
+                        <span class="toggle-label">Color Blob Tracking</span>
+                      </label>
+                      <input type="color" id="input-camera-target-color" value="#ef4444" style="width: 28px; height: 22px; padding: 0; background: none; border: 1px solid #475569; border-radius: 3px; cursor: pointer;">
+                    </div>
+                  </div>
+
+                  <!-- Snapshot Gallery -->
+                  <div class="vision-card-section" style="flex: 1;">
+                    <div class="vision-section-title">Recent Snapshots</div>
+                    <div id="camera-snapshot-gallery" class="snapshot-gallery-grid">
+                      <div class="gallery-empty">No snapshots captured yet. Press "Snap Photo" to record.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 5: Horizontal Waypoint Timeline -->
+            <div id="dock-view-timeline" class="dock-view-pane">
+              <div id="timeline-component-container" style="height: 100%; width: 100%;"></div>
+            </div>
+          </div>
+        </footer>
+
+      </section>
+
+    </main>
+
+  <!-- Direct Drive Confirmation Modal Dialog [R3] -->
+  <div class="modal-overlay hidden" id="modal_direct_drive_confirm" role="dialog" aria-modal="true" aria-labelledby="modal_dd_title">
+    <div class="modal-card modal-safety-dialog">
+      <div class="modal-header">
+        <span class="modal-icon">⚠️</span>
+        <span class="modal-title" id="modal_dd_title" data-i18n="safety.modal.title">ARM DIRECT DRIVE (LIVE PHYSICAL FOLLOW)?</span>
+      </div>
+      <div class="modal-body">
+        <p class="modal-warning-text" data-i18n="safety.modal.warn">
+          CAUTION: Physical robot arm will immediately mirror target inputs in real time!
+        </p>
+        <ul class="modal-checklist">
+          <li data-i18n="safety.modal.check1">Robot workspace is clear of obstacles and personnel</li>
+          <li data-i18n="safety.modal.check2">Emergency Stop (ESTOP) button is readily accessible</li>
+          <li data-i18n="safety.modal.check3">End-effector payload is securely mounted</li>
+        </ul>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btn_cancel_direct_drive" data-i18n="safety.modal.cancel">Cancel (Stay Safe)</button>
+        <button type="button" class="btn btn-danger" id="btn_confirm_direct_drive" data-i18n="safety.modal.confirm">Arm Direct Drive</button>
+        <!-- Aliases for survey code compatibility -->
+        <button type="button" id="btn_dd_cancel" style="display: none;" aria-hidden="true"></button>
+        <button type="button" id="btn_dd_confirm" style="display: none;" aria-hidden="true"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main ES Module Bootstrap Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

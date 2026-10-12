@@ -1,0 +1,92 @@
+╔════════════════════════════════════════════════════════════════╗
+║      ARDUINO PRO MICRO PINOUT - LEGACY MASTER CONTROLLER      ║
+╚════════════════════════════════════════════════════════════════╝
+
+BOARD: Arduino Pro Micro (16MHz, 5V or 3.3V)
+MCU: ATmega32U4
+VOLTAGE: 5V or 3.3V (check your board!)
+
+⚠️  NOTE: This is the LEGACY controller. Consider upgrading to ESP32-C3
+         for wireless control with ESP-NOW!
+
+═══════════════════════════════════════════════════════════════
+ POTENTIOMETER VERSION (Master_Controller)
+═══════════════════════════════════════════════════════════════
+Pot 1 (Base)     → A0 (Pin 18)
+Pot 2 (Shoulder) → A1 (Pin 19)
+Pot 3 (Elbow)    → A2 (Pin 20)
+Pot 4 (Wrist)    → A3 (Pin 21)
+Pot 5 (Gripper)  → A10 (Pin 10)
+
+All Pots: 10kΩ linear
+Wiring: VCC → 5V, GND → GND, Wiper → Analog Pin
+
+═══════════════════════════════════════════════════════════════
+ GESTURE VERSION (Master_Gesture)
+═══════════════════════════════════════════════════════════════
+MPU6050 (I2C):
+  SDA → Pin 2 (I2C SDA)
+  SCL → Pin 3 (I2C SCL)
+  VCC → 3.3V (⚠️ NOT 5V!)
+  GND → GND
+
+Digital Joystick:
+  UP    → Pin 4
+  DOWN  → Pin 5
+  LEFT  → Pin 6
+  RIGHT → Pin 7
+  CLICK → Pin 8
+
+Clutch Button → Pin 9
+Status LED    → Pin 10 (Built-in LED)
+
+═══════════════════════════════════════════════════════════════
+ USB CONNECTION TO TEENSY
+═══════════════════════════════════════════════════════════════
+Connect Pro Micro USB to Teensy 4.1 USB Host port:
+  D+ → Teensy Pin 34 (USB Host D+)
+  D- → Teensy Pin 33 (USB Host D-)
+  VCC → Teensy 5V
+  GND → Teensy GND
+
+Note: Use small USB header on bottom of Teensy 4.1
+
+═══════════════════════════════════════════════════════════════
+ PROGRAMMING
+═══════════════════════════════════════════════════════════════
+USB: Micro-USB
+Baud: 115200
+Bootloader: Caterina (Arduino Leonardo compatible)
+
+Arduino IDE Settings:
+  Board: "Arduino Leonardo" or "SparkFun Pro Micro"
+  Processor: "ATmega32U4 (5V, 16MHz)" or "(3.3V, 8MHz)"
+  Port: COMx (Windows) or /dev/ttyACMx (Linux)
+
+═══════════════════════════════════════════════════════════════
+ PINOUT SUMMARY
+═══════════════════════════════════════════════════════════════
+Digital Pins: 0-10, 14-16
+Analog Pins:  A0-A3 (18-21), A10 (10)
+I2C:          SDA=2, SCL=3
+PWM:          3, 5, 6, 9, 10, 11, 13
+TX/RX:        1/0 (Serial1)
+
+═══════════════════════════════════════════════════════════════
+ LIMITATIONS (Why upgrade to ESP32-C3?)
+═══════════════════════════════════════════════════════════════
+❌ Wired only (USB cable required)
+❌ Limited RAM (2.5KB)
+❌ Slow CPU (16MHz)
+❌ No wireless capability
+❌ Limited GPIO pins
+
+✅ ESP32-C3 Advantages:
+   - Wireless (ESP-NOW)
+   - 400KB RAM
+   - 160MHz CPU
+   - WiFi/BLE
+   - More GPIO
+   - Cheaper!
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,253 @@
+/**
+ * timeline.css - Horizontal Keyframe Track & Playhead Scrubber Styling
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ */
+
+.horizontal-timeline-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-void, #0d0e12);
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Timeline Toolbar */
+.timeline-toolbar-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-panel, #14161c);
+  border-bottom: 1px solid var(--border-metallic, #262930);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.timeline-transport-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tl-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-metallic, #262930);
+  margin: 0 4px;
+}
+
+.timeline-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timeline-meta-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: #38bdf8;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.timeline-loop-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+}
+
+/* Scrollable Ruler and Track Area */
+.timeline-scroll-track {
+  position: relative;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #090a0d;
+  scrollbar-gutter: stable;
+}
+
+/* Time Ruler */
+.timeline-ruler {
+  position: relative;
+  height: 22px;
+  background: rgba(18, 20, 26, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 4px;
+  pointer-events: none;
+}
+
+.ruler-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  color: var(--text-muted, #94a3b8);
+  line-height: 20px;
+}
+
+/* Keyframe Track Canvas */
+.timeline-track-canvas {
+  position: relative;
+  height: calc(100% - 22px);
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+/* Waypoint Blocks */
+.timeline-block {
+  position: relative;
+  height: 52px;
+  border-radius: var(--radius-xs, 3px);
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.timeline-block:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.timeline-block.selected {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+.timeline-block.dragging {
+  opacity: 0.4;
+}
+
+.timeline-block.drag-over {
+  border-left: 3px solid #38bdf8 !important;
+}
+
+/* Spline Move (Green) */
+.timeline-block.block-spline {
+  background: linear-gradient(180deg, #059669 0%, #047857 100%);
+  border: 1px solid #10b981;
+  color: #ffffff;
+}
+
+/* Linear MOVL Move (White/Titanium) */
+.timeline-block.block-movl {
+  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+  border: 1px solid #ffffff;
+  color: #0f172a;
+}
+.timeline-block.block-movl .block-sub,
+.timeline-block.block-movl .block-drag-handle {
+  color: #475569;
+}
+
+/* Gripper / Dwell Move (Amber) */
+.timeline-block.block-dwell {
+  background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
+  border: 1px solid #f59e0b;
+  color: #ffffff;
+}
+
+.block-drag-handle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: grab;
+}
+
+.block-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.block-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.block-sub {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.btn-block-del {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.timeline-block:hover .btn-block-del {
+  opacity: 1;
+}
+
+.btn-block-del:hover {
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+}
+
+/* Playhead Needle Cursor */
+.timeline-playhead-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  pointer-events: auto;
+  cursor: ew-resize;
+  z-index: 30;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+.playhead-head {
+  position: absolute;
+  top: -10px;
+  left: -5px;
+  font-size: 10px;
+  color: #ef4444;
+  line-height: 1;
+}
+
+.playhead-needle {
+  width: 100%;
+  height: 100%;
+}
+
+.timeline-empty-hint {
+  color: var(--text-muted, #94a3b8);
+  font-size: 11px;
+  font-style: italic;
+  padding: 16px;
+}

@@ -1,0 +1,101 @@
+╔════════════════════════════════════════════════════════════════╗
+║    TEENSY 4.1 PINOUT - 6-DOF ROBOT ARM CONTROLLER (URDF)       ║
+╚════════════════════════════════════════════════════════════════╝
+
+BOARD: Teensy 4.1 (600MHz ARM Cortex-M7)
+VOLTAGE: 3.3V Logic (5V tolerant on most pins)
+ROBOT MODEL: stppe_zlozenie_nowe (6-DOF Articulated Stepper Arm + Gripper Servo)
+
+═══════════════════════════════════════════════════════════════
+ STEPPER MOTORS J1–J6 (TMC2209 Drivers)
+═══════════════════════════════════════════════════════════════
+Axis 1 (Base Yaw, Z-rotation):
+  STEP → Pin 3
+  DIR  → Pin 2
+  EN   → Pin 6
+  Range: -90° .. +90°
+
+Axis 2 (Shoulder Pitch - 20:1 Geared):
+  STEP → Pin 11
+  DIR  → Pin 10
+  EN   → Pin 27
+  Range: -65° .. +115°
+
+Axis 3 (Elbow Pitch - 20:1 Geared):
+  STEP → Pin 29
+  DIR  → Pin 28
+  EN   → Pin 32
+  Range: -35° .. +170°
+
+Axis 4 (Forearm Roll):
+  STEP → Pin 34
+  DIR  → Pin 33
+  EN   → Pin 12
+  Range: -90° .. +90°
+
+Axis 5 (Wrist Pitch):
+  STEP → Pin 31
+  DIR  → Pin 30
+  EN   → Pin 12
+  Range: -90° .. +90° (Neutral 0°)
+
+Axis 6 (Tool Flange Roll):
+  STEP → Pin 23
+  DIR  → Pin 22
+  EN   → Pin 12
+  Range: -180° .. +180° (Continuous)
+
+TMC2209 UART Bus:
+  TX/RX → Pin 17 (Serial4 TX)
+  Note: Use 1kΩ pull-up to 3.3V on PDN_UART pin
+
+═══════════════════════════════════════════════════════════════
+ END EFFECTOR (GRIPPER)
+═══════════════════════════════════════════════════════════════
+Gripper Servo:
+  PWM  → Pin 21
+  Range: 0° (Fully Closed) .. 180° (Fully Open)
+
+═══════════════════════════════════════════════════════════════
+ AS5600 MAGNETIC ENCODERS (Hardware I2C)
+═══════════════════════════════════════════════════════════════
+Encoder 2 (Shoulder - Wire):
+  SDA → Pin 18
+  SCL → Pin 19
+
+Encoder 3 (Elbow - Wire1):
+  SDA → Pin 44
+  SCL → Pin 45
+
+AS5600 Wiring (Each):
+  VCC → 3.3V
+  GND → GND
+  DIR → GND (Clockwise)
+
+═══════════════════════════════════════════════════════════════
+ COMMUNICATION
+═══════════════════════════════════════════════════════════════
+PC Serial (USB):
+  Baud: 115200
+
+USB Host (For Master Controller):
+  D+  → USB Host header D+
+  D-  → USB Host header D-
+
+ESP32 Serial (Optional):
+  RX  → Pin 0 (Serial1 RX)
+  TX  → Pin 1 (Serial1 TX)
+  Baud: 115200
+
+═══════════════════════════════════════════════════════════════
+ POWER
+═══════════════════════════════════════════════════════════════
+Teensy Power:
+  VIN → 5V (USB or external)
+  GND → Common Ground
+
+Motor Power:
+  TMC2209: 12-24V (separate supply)
+  Gripper Servo: 5-6V (separate supply)
+  
+⚠️  IMPORTANT: Keep logic ground common, but isolate motor power!

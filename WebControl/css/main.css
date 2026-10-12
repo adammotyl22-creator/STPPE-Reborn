@@ -1,0 +1,722 @@
+/**
+ * main.css - Modular 2-Column Dashboard Grid Layout & Soft Neutral Modern Design
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ */
+
+@import './theme/cyberpunk-dark.css';
+@import './components/header.css';
+@import './components/left-rail.css';
+@import './components/viewport.css';
+@import './components/motion-panel.css';
+@import './components/trajectory-studio.css';
+@import './components/telemetry-charts.css';
+@import './components/console.css';
+@import './components/camera-hud.css';
+@import './components/timeline.css';
+
+/* Box-Sizing Global Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+}
+
+button, input, select {
+  touch-action: manipulation;
+}
+
+/* Master App Container (Strict 100vh Viewport Budget - Zero Vertical Scroll) */
+#app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-void);
+  background-image: none;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+/* Master Navigation & Safety Header */
+#header-container {
+  flex-shrink: 0;
+  width: 100%;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding: 0 10px;
+  z-index: 100;
+  border-bottom: 1px solid var(--border-metallic);
+  background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow: visible;
+  position: relative;
+}
+
+/* Main Workspace: Modular 2-Column Dashboard */
+#main-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  padding: 8px;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-void);
+  align-items: stretch;
+}
+
+/* ============================================================================
+   COLUMN 1: LEFT CONTROL PANEL (370px Fixed Width with Collapsible Sections)
+   ============================================================================ */
+
+#left-panel {
+  width: 370px;
+  min-width: 370px;
+  max-width: 370px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+  transition: width var(--transition-dock), min-width var(--transition-dock), max-width var(--transition-dock);
+  position: relative;
+}
+
+#left-panel.panel-collapsed {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+}
+
+#left-panel.panel-collapsed .panel-header,
+#left-panel.panel-collapsed .panel-mode-tabs,
+#left-panel.panel-collapsed .motion-panel {
+  display: none !important;
+}
+
+#left-panel .panel-collapsed-rail {
+  display: none;
+}
+
+#left-panel.panel-collapsed .panel-collapsed-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  padding: 8px 0;
+  background: var(--bg-panel);
+}
+
+/* Compatibility rules for right-panel */
+#right-panel.panel-collapsed {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+}
+
+#right-panel.panel-collapsed .panel-header,
+#right-panel.panel-collapsed #trajectory-container {
+  display: none !important;
+}
+
+#right-panel .panel-collapsed-rail {
+  display: none;
+}
+
+#right-panel.panel-collapsed .panel-collapsed-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  padding: 8px 0;
+  background: var(--bg-panel);
+}
+
+/* ============================================================================
+   PANEL HEADER BARS & COLLAPSED ICON RAILS
+   ============================================================================ */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 10px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-metallic);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.panel-title {
+  text-transform: uppercase;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.panel-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all var(--transition-fast);
+}
+
+.panel-collapse-btn::before {
+  content: '‹';
+  font-size: 14px;
+  line-height: 1;
+}
+
+.panel-collapse-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.panel-rail-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.panel-rail-btn .rail-icon {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.panel-rail-btn .rail-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.panel-rail-btn .rail-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+
+.panel-rail-btn .rail-chevron::before {
+  content: '›';
+  font-size: 14px;
+}
+
+.panel-rail-btn:hover .rail-text,
+.panel-rail-btn:hover .rail-icon,
+.panel-rail-btn:hover .rail-chevron {
+  color: var(--text-primary);
+}
+
+/* ============================================================================
+   LEFT PANEL ACCORDION CARDS & SCROLL CONTAINMENT
+   ============================================================================ */
+
+#motion-panel-container,
+.motion-panel {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accordion-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+}
+
+.accordion-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid transparent;
+  transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.accordion-header:hover {
+  background: var(--bg-hover);
+}
+
+.accordion-card.open .accordion-header {
+  border-bottom-color: var(--border-metallic);
+}
+
+.accordion-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.accordion-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.accordion-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.accordion-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+}
+
+.accordion-chevron::before {
+  content: '▾';
+}
+
+.accordion-card.open .accordion-chevron {
+  transform: rotate(0deg);
+  color: var(--text-primary);
+}
+
+.accordion-card:not(.open) .accordion-chevron {
+  transform: rotate(-90deg);
+}
+
+.accordion-body {
+  display: none;
+  padding: 8px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accordion-card.open .accordion-body {
+  display: flex;
+}
+
+#trajectory-container {
+  flex: 1 1 auto;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Axis & Joint Nudge Groups */
+.axis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.slider-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nudge-group,
+.joint-nudges {
+  display: flex;
+  gap: 2px;
+}
+
+.joint-nudges {
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+
+/* ============================================================================
+   COLUMN 2: RIGHT COLUMN (Maximized 3D Viewport + Collapsible Bottom Dock)
+   ============================================================================ */
+
+#right-column {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* Center 3D Viewport Panel */
+#center-panel,
+.viewport-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   COLLAPSIBLE BOTTOM DOCK DRAWER (TELEMETRY & SERIAL TERMINAL)
+   ============================================================================ */
+
+#bottom-dock {
+  flex-shrink: 0;
+  height: 280px;
+  min-height: 38px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  display: flex;
+  flex-direction: column;
+  transition: height var(--transition-dock);
+  position: relative;
+  z-index: 90;
+  overflow: hidden;
+}
+
+#bottom-dock.dock-collapsed {
+  height: 38px !important;
+}
+
+#bottom-dock.dock-expanded {
+  height: 280px;
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 10px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-metallic);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.dock-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.dock-tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.dock-tab-btn.active {
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  border-color: var(--border-metallic);
+  border-bottom-color: var(--bg-panel);
+  font-weight: 600;
+}
+
+.dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dock-toggle-btn {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dock-toggle-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--bg-hover);
+}
+
+/* Dock Content Wrapper */
+.dock-content-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.dock-view-pane {
+  width: 100%;
+  height: 100%;
+  display: none;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.dock-view-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Split View Pane */
+.dock-view-split {
+  display: none;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.dock-view-split.active {
+  display: grid;
+}
+
+.split-left, .split-right {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#telemetry-split-container,
+#console-split-container,
+#telemetry-full-container,
+#console-full-container {
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN BREAKPOINTS (1180px to 4K)
+   ============================================================================ */
+
+@media (min-width: 2200px) {
+  #left-panel:not(.panel-collapsed) {
+    width: 420px;
+    min-width: 420px;
+    max-width: 420px;
+  }
+
+  #bottom-dock.dock-expanded {
+    height: 380px;
+  }
+}
+
+@media (max-width: 1560px) {
+  #left-panel:not(.panel-collapsed) {
+    width: 350px;
+    min-width: 350px;
+    max-width: 350px;
+  }
+}
+
+@media (max-width: 1360px) {
+  #left-panel:not(.panel-collapsed) {
+    width: 330px;
+    min-width: 330px;
+    max-width: 330px;
+  }
+
+  #bottom-dock.dock-expanded {
+    height: 260px;
+  }
+}
+
+@media (max-width: 1180px) {
+  #left-panel:not(.panel-collapsed) {
+    width: 310px;
+    min-width: 310px;
+    max-width: 310px;
+  }
+
+  #bottom-dock.dock-expanded {
+    height: 220px;
+  }
+
+  .dock-view-split {
+    grid-template-columns: 1fr;
+    grid-auto-rows: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  #left-panel:not(.panel-collapsed) {
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+  }
+
+  #bottom-dock.dock-expanded {
+    height: 180px;
+  }
+}
+
+/* Shared radius roles: surfaces 8px, controls 6px, status pill full. */
+.hidden {
+  display: none !important;
+}
+
+:is([class*="-panel"], [class*="-card"]):not(button),
+#left-panel,
+#right-panel,
+#bottom-dock,
+.viewport-container,
+.workspace-nav {
+  border-radius: var(--radius-lg) !important;
+}
+
+button:not(.status-pill),
+input,
+select,
+textarea {
+  border-radius: var(--radius-md) !important;
+}
+
+.status-pill {
+  border-radius: var(--radius-pill) !important;
+}
+
+.btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.btn-icon-only .ico {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+

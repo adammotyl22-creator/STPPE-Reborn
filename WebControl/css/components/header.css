@@ -1,0 +1,1272 @@
+/**
+ * header.css - Safety Ribbon & Operations Bar
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ *
+ * Single 50px row with 3 visual zones:
+ *   Left:   Brand + Status Pill + Mode Badge (IDLE)
+ *   Center: Homing Controls
+ *   Right:  Speed + Gamepad + Pendant → ║ Safety Divider ║ → REENABLE + E-STOP
+ */
+
+/* ============================================================================
+   1. MASTER HEADER CONTAINER (50px Single Row)
+   ============================================================================ */
+
+.header-container {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 10px;
+  background: var(--bg-panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border-metallic);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  user-select: none;
+  gap: 8px;
+  overflow: visible;
+  z-index: 100;
+  position: relative;
+}
+
+/* ============================================================================
+   2. LEFT ZONE: Identity & Status
+   ============================================================================ */
+
+.header-zone-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.header-brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.header-brand-text {
+  text-transform: uppercase;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
+}
+
+/* Status Pill (Clickable - Opens Connection Popover) */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 14px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid var(--border-metallic);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all 150ms ease;
+  position: relative;
+  outline: none;
+}
+
+.status-pill:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.status-pill:focus-visible {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+.status-pill[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.status-pill[aria-expanded="true"] .status-chevron {
+  transform: rotate(180deg);
+}
+
+/* Status Dot (color-coded glow) */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+  box-shadow: 0 0 4px rgba(148, 163, 184, 0.3);
+  transition: background 300ms ease, box-shadow 300ms ease;
+}
+
+.status-dot.dot-disconnected {
+  background: #64748b;
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.4);
+}
+
+.status-dot.dot-connecting {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+  animation: pulse-dot 1.4s infinite;
+}
+
+.status-dot.dot-connected {
+  background: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+.status-dot.dot-streaming {
+  background: #34d399;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
+  animation: glow-dot 2s infinite alternate;
+}
+
+.status-dot.dot-error {
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+}
+
+.status-dot.dot-estop {
+  background: #dc2626;
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.7);
+  animation: pulse-dot 0.6s infinite;
+}
+
+.status-dot.dot-simulation {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.status-pill-label {
+  line-height: 1;
+}
+
+.status-chevron {
+  font-size: 9px;
+  color: var(--text-muted);
+  transition: transform 200ms ease;
+  margin-left: 1px;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes glow-dot {
+  0% { box-shadow: 0 0 6px rgba(52, 211, 153, 0.4); }
+  100% { box-shadow: 0 0 12px rgba(52, 211, 153, 0.7); }
+}
+
+/* Mode Badge (IDLE / HOMING) - sits next to status pill */
+.header-zone-left #badge_homing_status,
+.header-zone-left .badge-idle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-metallic);
+}
+
+.badge-warning.pulsing {
+  background: rgba(217, 119, 6, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+  animation: pulse-badge 1.2s infinite alternate;
+}
+
+/* ============================================================================
+   3. CENTER ZONE: Homing Controls
+   ============================================================================ */
+
+.header-zone-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.homing-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-section-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Split-Button Homing Controls & Dropdown */
+.home-split-group {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  background: var(--bg-inset);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-home-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: none !important;
+  border-right: 1px solid var(--border-metallic) !important;
+  border-radius: var(--radius-xs) 0 0 var(--radius-xs) !important;
+  padding: 0 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  height: 28px;
+  outline: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-home-primary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-home-primary:active {
+  background: var(--bg-active);
+}
+
+.ico-home {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #10b981;
+}
+
+.btn-home-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: none !important;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0 !important;
+  width: 22px;
+  height: 28px;
+  font-size: 9px;
+  cursor: pointer;
+  outline: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-home-chevron:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-home-chevron[aria-expanded="true"] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Homing Dropdown Menu */
+.home-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  z-index: 150;
+  padding: 4px;
+}
+
+.home-dropdown-menu.open {
+  display: block;
+}
+
+.home-menu-header {
+  font-size: 8.5px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  padding: 5px 8px 3px;
+  text-transform: uppercase;
+}
+
+.home-menu-divider {
+  height: 1px;
+  background: var(--border-metallic);
+  margin: 3px 0;
+}
+
+.home-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 2px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.home-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.home-menu-axis {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  color: #10b981;
+}
+
+.home-menu-desc {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.home-menu-item:hover .home-menu-desc {
+  color: var(--text-secondary);
+}
+
+/* Segmented Control Button Strip & Standalone Buttons (Fallback support) */
+.btn-group {
+  display: inline-flex;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  background: var(--bg-inset);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-group .btn-home {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: none !important;
+  border-right: 1px solid var(--border-metallic) !important;
+  border-radius: 0 !important;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  height: 28px;
+  outline: none;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-instant);
+}
+
+.btn-group .btn-home:last-child {
+  border-right: none !important;
+}
+
+.btn-group .btn-home:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-group .btn-home:active {
+  background: var(--bg-active);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.btn-home {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-metallic);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  height: 28px;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-instant);
+}
+
+.btn-home:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.btn-home:active {
+  background: var(--bg-active);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Gantry Jog Hidden */
+.gantry-jog-hidden {
+  display: none !important;
+}
+
+/* ============================================================================
+   4. RIGHT ZONE: Overrides & Safety
+   ============================================================================ */
+
+.header-zone-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Speed Override Gauge (Fixed-width slider, tabular figures) */
+.speed-override-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  background: var(--bg-card);
+  padding: 2px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  box-shadow: var(--shadow-sm);
+  height: 28px;
+}
+
+.speed-slider,
+#slider_speed_override {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 96px;           /* Fixed w-24 to prevent layout shifts */
+  height: 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  cursor: pointer;
+  margin: 0;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.speed-slider::-webkit-slider-thumb,
+#slider_speed_override::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  width: 8px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  border: 1px solid #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-instant);
+}
+
+.speed-slider::-moz-range-thumb,
+#slider_speed_override::-moz-range-thumb {
+  height: 14px;
+  width: 8px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  border: 1px solid #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.speed-slider:hover::-webkit-slider-thumb,
+#slider_speed_override:hover::-webkit-slider-thumb {
+  background: #ffffff;
+}
+
+.speed-slider:active::-webkit-slider-thumb,
+#slider_speed_override:active::-webkit-slider-thumb {
+  background: #f1f5f9;
+  transform: scale(0.95);
+}
+
+.speed-val,
+#label_speed_val {
+  min-width: 36px;
+  width: 36px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Gamepad Indicator Badge */
+.gamepad-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.gamepad-badge.connected {
+  border-color: #10b981;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.gamepad-badge.active-jog {
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.gamepad-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+}
+
+.gamepad-icon .ico {
+  width: 14px;
+  height: 14px;
+}
+
+/* Teach Pendant Fullscreen Trigger */
+.btn-pendant-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  padding: 3px 8px;
+  height: 28px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+}
+
+.btn-pendant-toggle:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-pendant-toggle:active {
+  color: #10b981;
+  border-color: #10b981;
+}
+
+.pendant-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  line-height: 1;
+}
+
+.pendant-icon .ico {
+  width: 13px;
+  height: 13px;
+}
+
+/* ============================================================================
+   5. SAFETY ZONE (Isolated E-STOP + Stateful REENABLE)
+   Separated from operational controls by a visible divider + generous margin
+   ============================================================================ */
+
+.header-safety-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-left: 16px;
+  margin-left: 16px;
+  border-left: 1px solid rgba(100, 116, 139, 0.5);
+  position: relative;
+  height: 100%;
+}
+
+/* ESTOP-active state: entire safety zone gets hazard background */
+.header-safety-zone.estop-tripped {
+  background: rgba(220, 38, 38, 0.08);
+  border-left-color: rgba(220, 38, 38, 0.5);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  padding: 4px 8px 4px 16px;
+  margin: -4px -10px -4px 16px;
+}
+
+/* REENABLE Button - Always accessible in Safety Zone, highlighted during ESTOP */
+.btn-reenable,
+#btn_reenable {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-metallic);
+  padding: 0 12px;
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  height: 38px;
+  box-shadow: var(--shadow-sm);
+  transition: all 150ms ease;
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-reenable:hover,
+#btn_reenable:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+}
+
+.btn-reenable:active,
+#btn_reenable:active {
+  background: var(--bg-active);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* When ESTOP is active: REENABLE becomes the primary glowing amber recovery action */
+.header-safety-zone.estop-tripped .btn-reenable,
+.header-safety-zone.estop-tripped #btn_reenable,
+.btn-reenable.recovery-mode,
+#btn_reenable.recovery-mode {
+  background: rgba(217, 119, 6, 0.25) !important;
+  color: #fbbf24 !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  animation: pulse-reenable 1.2s infinite alternate !important;
+}
+
+.header-safety-zone.estop-tripped .btn-reenable:hover,
+.header-safety-zone.estop-tripped #btn_reenable:hover,
+.btn-reenable.recovery-mode:hover,
+#btn_reenable.recovery-mode:hover {
+  background: rgba(217, 119, 6, 0.4) !important;
+  color: #ffffff !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.65) !important;
+}
+
+.header-safety-zone.estop-tripped .btn-reenable:active,
+.header-safety-zone.estop-tripped #btn_reenable:active,
+.btn-reenable.recovery-mode:active,
+#btn_reenable.recovery-mode:active {
+  background: #d97706 !important;
+  color: #ffffff !important;
+  transform: translateY(1px);
+}
+
+@keyframes pulse-reenable {
+  from {
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+    border-color: rgba(245, 158, 11, 0.7);
+  }
+  to {
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.65);
+    border-color: #fbbf24;
+  }
+}
+
+/* E-STOP Button - High contrast, isolated, tactile */
+.btn-estop,
+#btn_estop {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  letter-spacing: 0.6px;
+  padding: 0 18px;
+  height: 38px;
+  border: 2px solid #b91c1c;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.4);
+  transition: background 100ms ease, border-color 100ms ease, transform 60ms ease;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.estop-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.btn-estop:hover,
+#btn_estop:hover {
+  background: #b91c1c;
+  border-color: #991b1b;
+  box-shadow: 0 0 16px rgba(220, 38, 38, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.btn-estop:active,
+#btn_estop:active {
+  background: #991b1b;
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.btn-estop.estop-active,
+.btn-estop.flashing-alert,
+.flashing-alert {
+  background: #dc2626 !important;
+  animation: estop-flash 0.6s infinite alternate !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+@keyframes estop-flash {
+  from { background: #dc2626; box-shadow: 0 0 16px rgba(220, 38, 38, 0.4); }
+  to { background: #ef4444; box-shadow: 0 0 24px rgba(239, 68, 68, 0.6); }
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ============================================================================
+   6. CONNECTION SETTINGS POPOVER
+   ============================================================================ */
+
+.connection-popover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 10px;
+  width: 280px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 200;
+  padding: 0;
+  transform: translateY(-4px);
+  opacity: 0;
+  transition: transform 150ms ease, opacity 150ms ease;
+  pointer-events: none;
+}
+
+.connection-popover.popover-open {
+  display: block;
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.popover-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-metallic);
+}
+
+.popover-section:last-child {
+  border-bottom: none;
+}
+
+.popover-section-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.popover-row-options {
+  gap: 12px;
+}
+
+/* Transport Toggle in Popover */
+.connection-popover .transport-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  padding: 2px;
+  gap: 2px;
+  height: 30px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.connection-popover .btn-transport {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 8px;
+  height: 24px;
+  line-height: 24px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+
+.connection-popover .btn-transport:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.connection-popover .btn-transport.active {
+  background: var(--bg-panel);
+  color: #10b981;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Baud Rate Dropdown in Popover */
+.connection-popover .baud-select,
+.connection-popover #select_baud_rate {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--bg-inset);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath fill='%2394a3b8' d='M0 0l4 4 4-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 8px 5px;
+  color: var(--text-primary);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  padding: 4px 22px 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  height: 32px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.connection-popover .baud-select:hover,
+.connection-popover #select_baud_rate:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.connection-popover .baud-select:focus,
+.connection-popover #select_baud_rate:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+
+.connection-popover .baud-select option,
+.connection-popover #select_baud_rate option {
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Wi-Fi Host/IP Input in Popover */
+.connection-popover .ws-config-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.connection-popover .ws-url-input {
+  background-color: var(--bg-inset);
+  color: var(--text-primary);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  height: 32px;
+  width: 100%;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast);
+}
+
+.connection-popover .ws-url-input:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.connection-popover .ws-url-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981;
+}
+
+/* Mock & Auto Reconnect Toggles in Popover */
+.connection-popover .mock-toggle-label,
+.connection-popover .auto-reconnect-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.connection-popover .mock-toggle-label:hover,
+.connection-popover .auto-reconnect-label:hover {
+  color: var(--text-primary);
+}
+
+.connection-popover .mock-toggle-label input,
+.connection-popover .auto-reconnect-label input {
+  cursor: pointer;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: #10b981;
+}
+
+.connection-popover .mock-toggle-label input:checked + .mock-mode-text {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.connection-popover .auto-reconnect-label input:checked + .auto-reconnect-text {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+/* Language Toggle in Popover */
+.popover-lang-btn {
+  width: 100%;
+  justify-content: center;
+  height: 32px;
+  padding: 4px 12px;
+}
+
+/* Language Toggle (base styles kept for popover use) */
+.btn-lang-toggle,
+#btn_lang_toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 3px 9px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-lang-toggle:hover,
+#btn_lang_toggle:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.btn-lang-toggle:active,
+#btn_lang_toggle:active {
+  background: var(--bg-active);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.btn-lang-toggle .lang-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.flag-ico {
+  width: 15px;
+  height: 11px;
+  border-radius: 1px;
+  display: block;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.btn-lang-toggle .lang-code {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  min-width: 16px;
+}
+
+.btn-lang-toggle[data-lang="pl"] {
+  border-color: rgba(220, 80, 80, 0.4);
+  color: #fbbf24;
+}
+
+.btn-lang-toggle[data-lang="pl"]:hover {
+  border-color: rgba(220, 80, 80, 0.6);
+  color: #ffffff;
+}
+
+/* Connect Button in Popover */
+.popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.popover-connect-btn {
+  flex: 1;
+  height: 34px;
+  padding: 4px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  letter-spacing: 0.3px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+/* Telemetry Rate in Popover */
+.popover-telem-rate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   7. RESPONSIVE HEADER ADJUSTMENTS
+   ============================================================================ */
+
+@media (max-width: 1680px) {
+  .header-container {
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .speed-slider,
+  #slider_speed_override {
+    width: 80px;
+  }
+}
+
+@media (max-width: 1480px) {
+  .header-brand-text {
+    display: none;
+  }
+
+  .btn-home {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .speed-slider,
+  #slider_speed_override {
+    width: 64px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .btn-pendant-toggle .pendant-text {
+    display: none !important;
+  }
+
+  .btn-estop,
+  #btn_estop {
+    padding: 0 12px;
+    font-size: 10.5px;
+  }
+
+  .estop-icon {
+    display: none;
+  }
+}
+
+@media (max-width: 1320px) {
+  .homing-panel .btn-group .btn-home[data-home-target="J1"],
+  .homing-panel .btn-group .btn-home[data-home-target="J2"],
+  .homing-panel .btn-group .btn-home[data-home-target="J3"] {
+    display: none !important;
+  }
+
+  .speed-override-control span[data-i18n="header.speed.label"] {
+    display: none !important;
+  }
+
+  .speed-slider,
+  #slider_speed_override {
+    width: 50px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .header-zone-left #badge_homing_status {
+    display: none !important;
+  }
+
+  #gamepad-status-indicator .gamepad-text {
+    display: none !important;
+  }
+
+  .btn-estop,
+  #btn_estop {
+    padding: 0 10px;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+  }
+
+  .header-container {
+    padding: 0 6px;
+    gap: 4px;
+  }
+
+  .header-safety-zone {
+    padding-left: 10px;
+    margin-left: 10px;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 950px) {
+  .header-zone-center {
+    display: none !important;
+  }
+
+  #gamepad-status-indicator {
+    display: none !important;
+  }
+}

@@ -1,0 +1,654 @@
+/**
+ * cyberpunk-dark.css - Soft Neutral Modern Precision Design System
+ * Teensy 4.1 6-DOF Robot Arm Automation Studio
+ *
+ * Design System Specifications:
+ * - Palette: #111317 (void backdrop), #181a20 (structural panels), #20232a (instrument cards), #282c35 (elevated surfaces), #0d0f12 (inset readout wells)
+ * - Borders: 1px subtle neutral borders (rgba(255, 255, 255, 0.08) / #2f3440)
+ * - Typography: 'Inter' for controls, 'JetBrains Mono' for telemetry/coordinates/logs
+ * - Soft Calibrated Accents: Neutral Titanium (#e2e8f0), Soft Sage (#10b981), Warm Sand/Amber (#d97706), Clean Safety Red (#dc2626)
+ * - Zero neon colors, zero blue glow halos, zero glassmorphic blurs, zero visual noise
+ *
+ * Refactored: semantic tokens, rem typography scale, @layer organization,
+ * color-mix() tints, dedicated ESTOP touch-target.
+ */
+
+@layer tokens, base, components;
+
+
+@layer tokens {
+:root {
+  /* ==========================================================================
+     1. SOFT NEUTRAL VOID & STRUCTURAL SURFACE PALETTE
+     ========================================================================== */
+  --bg-void: #111317;             /* Soft neutral charcoal backdrop */
+  --bg-panel: #181a20;            /* Warm slate-neutral structural console panel */
+  --bg-card: #20232a;             /* Instrument card & container surface */
+  --bg-elevated: #282c35;         /* Elevated surface, tabs & active headers */
+  --bg-hover: #313642;            /* Subtle interactive hover feedback surface */
+  --bg-active: #1d2026;           /* Tactile active / pressed surface */
+  --bg-inset: #0d0f12;            /* Inset channel well & digital readout */
+  --bg-surface-subtle: #14161c;   /* Secondary recessed surface */
+
+  /* ==========================================================================
+     2. SOFT, NON-NEON CALIBRATED TECHNICAL SIGNAL ACCENTS
+     ========================================================================== */
+  /* Primary Neutral Accent: Soft Titanium / Warm White */
+  --accent-neutral: #e2e8f0;
+  --accent-neutral-bright: #f1f5f9;
+  --accent-neutral-ink: #0f1115;
+  --accent-neutral-tint: color-mix(in srgb, var(--accent-neutral) 10%, transparent);
+  --accent-neutral-tint-strong: color-mix(in srgb, var(--accent-neutral) 20%, transparent);
+  --accent-neutral-tint-soft: color-mix(in srgb, var(--accent-neutral) 8%, transparent);
+
+  /* Status Accent: Soft Sage Green */
+  --accent-emerald: #10b981;
+  --accent-emerald-bright: #34d399;
+  --accent-emerald-tint: color-mix(in srgb, var(--accent-emerald) 12%, transparent);
+  --accent-emerald-tint-strong: color-mix(in srgb, var(--accent-emerald) 22%, transparent);
+  --accent-emerald-tint-stronger: color-mix(in srgb, var(--accent-emerald) 35%, transparent);
+
+  /* Warning / Secondary Accent: Warm Sand / Industrial Amber */
+  --accent-amber: #d97706;
+  --accent-amber-bright: #f59e0b;
+  --accent-amber-tint: color-mix(in srgb, var(--accent-amber) 12%, transparent);
+  --accent-amber-tint-strong: color-mix(in srgb, var(--accent-amber) 22%, transparent);
+  --accent-amber-tint-stronger: color-mix(in srgb, var(--accent-amber) 35%, transparent);
+
+  /* Safety Accent: Clean Industrial Crimson (No Glowing Halos) */
+  --accent-crimson: #dc2626;
+  --accent-crimson-border: #b91c1c;
+  --accent-crimson-dark: #991b1b;
+  --accent-crimson-bright: #f87171;
+  --accent-crimson-tint: color-mix(in srgb, var(--accent-crimson) 12%, transparent);
+
+  /* Control Accent: Neutral Slate / Charcoal (Replaced Blue) */
+  --accent-slate: #a1a1aa;
+  --accent-slate-tint: color-mix(in srgb, var(--accent-slate) 12%, transparent);
+
+  /* Slider Hardware Tokens */
+  --slider-knob: #475569;
+  --slider-knob-border: #64748b;
+
+  /* Backward Compatibility Aliases */
+  --signal-cyan: var(--accent-neutral);
+  --neon-cyan: var(--accent-neutral);
+  --neon-cyan-subtle: var(--accent-neutral-tint);
+  --signal-emerald: var(--accent-emerald);
+  --neon-emerald: var(--accent-emerald);
+  --neon-emerald-subtle: var(--accent-emerald-tint);
+  --signal-amber: var(--accent-amber);
+  --neon-amber: var(--accent-amber);
+  --neon-amber-subtle: var(--accent-amber-tint);
+  --signal-crimson: var(--accent-crimson);
+  --neon-crimson: var(--accent-crimson);
+  --neon-crimson-dark: var(--accent-crimson-dark);
+  --neon-crimson-subtle: var(--accent-crimson-tint);
+  --signal-blue: var(--accent-slate);
+  --neon-blue: var(--accent-slate);
+  --neon-blue-subtle: var(--accent-slate-tint);
+
+  /* ==========================================================================
+     3. HIGH-CONTRAST TYPOGRAPHIC COLOR HIERARCHY (WCAG AA PASS)
+     ========================================================================== */
+  --text-primary: #f8fafc;        /* Slate-50: crisp, readable primary text (15.5:1 contrast) */
+  --text-secondary: #cbd5e1;      /* Slate-300: comfortable secondary text (10.8:1 contrast) */
+  --text-muted: #94a3b8;          /* Slate-400: subtle labels and hints (6.2:1 contrast) */
+  --text-inverse: #111317;        /* Void dark text for active light buttons */
+
+  /* ==========================================================================
+     4. CRISP SUBTLE METALLIC BORDERS & DIVIDERS
+     ========================================================================== */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-metallic: #2a2f3b;
+  --border-subtle: #1e222b;
+  --border-focus: rgba(226, 232, 240, 0.45);
+
+  /* ==========================================================================
+     5. TYPOGRAPHIC SCALE & FONT STACKS
+     ========================================================================== */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', 'Cascadia Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: var(--font-sans);
+  --font-telemetry: var(--font-mono);
+  --font-code: var(--font-mono);
+
+  /* Font Sizes */
+  --font-size-2xs: 0.5625rem; /* 9px */
+  --font-size-xs: 0.625rem;   /* 10px */
+  --font-size-sm: 0.6875rem;  /* 11px */
+  --font-size-base: 0.75rem;   /* 12px */
+  --font-size-md: 0.8125rem;  /* 13px */
+  --font-size-lg: 0.875rem;   /* 14px */
+  --font-size-xl: 1rem;       /* 16px */
+  --font-size-2xl: 1.125rem;  /* 18px */
+
+  /* Font Weights */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.1;
+  --line-height-snug: 1.25;
+  --line-height-normal: 1.4;
+  --line-height-relaxed: 1.5;
+
+  /* Letter Tracking */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+  --tracking-widest: 0.12em;
+  --letter-spacing-sm: 0.3px;
+  --letter-spacing-md: 0.5px;
+  --letter-spacing-lg: 0.8px;
+
+  /* ==========================================================================
+     6. SPACING RHYTHM (4px BASE UNIT)
+     ========================================================================== */
+  --spacing-2xs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --gap-panel: 8px;
+  --gap-element: 4px;
+
+  /* ==========================================================================
+     7. ELEVATION & INSET TACTILE SHADOWS (ZERO BLUR GLOWS)
+     ========================================================================== */
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 10px rgba(0, 0, 0, 0.5);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  --shadow-inset-well: inset 0 1px 3px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+
+  /* Border Radii (Clean, Refined Rounded Chamfers) */
+  --radius-none: 0px;
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  /* ==========================================================================
+     8. MOTION & TRANSITIONS
+     ========================================================================== */
+  --ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-industrial: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-dock: cubic-bezier(0.2, 0, 0, 1);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --duration-instant: 0.08s;
+  --duration-fast: 0.12s;
+  --duration-normal: 0.20s;
+
+  --transition-instant: 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.20s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-dock: 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+}
+
+
+@layer base {
+/* Base Body Styles */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-void);
+  background-image: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   BROWSER SURFACE TUNING (SCROLLBARS, SELECTION, CARETS, FOCUS RINGS)
+   ========================================================================== */
+
+/* Custom Precision Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-inset);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  border: 1px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-elevated) var(--bg-inset);
+}
+
+/* Selection Highlight */
+::selection {
+  background: rgba(226, 232, 240, 0.2);
+  color: var(--text-primary);
+}
+
+::-moz-selection {
+  background: rgba(226, 232, 240, 0.2);
+  color: var(--text-primary);
+}
+
+/* Caret Color */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  caret-color: var(--accent-neutral);
+}
+
+/* Global Focus Visible Outline */
+:focus-visible {
+  outline: 1px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+}
+}
+
+@layer components {
+/* ==========================================================================
+   PANEL & CARD BASE CLASSES
+   ========================================================================== */
+
+.cad-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-sm);
+}
+
+.cad-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cad-inset {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-inset);
+}
+
+/* ==========================================================================
+   TACTILE WORKSTATION BUTTON UTILITIES (.btn)
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  letter-spacing: var(--letter-spacing-sm);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-metallic);
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-sm);
+  transition: background var(--transition-fast), 
+              border-color var(--transition-fast), 
+              color var(--transition-fast), 
+              transform var(--transition-instant), 
+              box-shadow var(--transition-fast);
+  outline: none;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  background: var(--bg-active);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Primary Action Button (Clean Titanium Neutral on Dark Base) */
+.btn-primary {
+  background: var(--accent-neutral-bright);
+  color: var(--accent-neutral-ink);
+  border: 1px solid var(--accent-neutral);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--text-primary);
+  color: #0f1115;
+}
+
+.btn-primary:active:not(:disabled) {
+  background: #cbd5e1;
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-metallic);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+/* Danger / ESTOP Actuator Button (Solid Clean Crimson - No Halos) */
+.btn-danger,
+.btn-estop {
+  background: var(--accent-crimson);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-crimson-border);
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.btn-danger:hover:not(:disabled),
+.btn-estop:hover:not(:disabled) {
+  background: var(--accent-crimson-border);
+  border-color: var(--accent-crimson-dark);
+  color: var(--text-primary);
+}
+
+.btn-danger:active:not(:disabled),
+.btn-estop:active:not(:disabled) {
+  background: var(--accent-crimson-dark);
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* Emergency Stop Actuator (Dedicated Oversized Hit Target - Industrial Safety Spec) */
+.btn-estop {
+  min-height: 48px;
+  min-width: 100px;
+  padding: 12px 20px;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+/* Warning / Re-enable Safety Actuator */
+.btn-warning,
+.btn-reenable {
+  background: var(--accent-amber-tint);
+  color: var(--accent-amber-bright);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  font-weight: 600;
+}
+
+.btn-warning:hover:not(:disabled),
+.btn-reenable:hover:not(:disabled) {
+  background: var(--accent-amber-tint-strong);
+  border-color: var(--accent-amber-bright);
+  color: var(--text-primary);
+}
+
+.btn-warning:active:not(:disabled),
+.btn-reenable:active:not(:disabled) {
+  background: var(--accent-amber-tint-stronger);
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Success / Move Spline Button */
+.btn-success {
+  background: var(--accent-emerald-tint);
+  color: var(--accent-emerald-bright);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  font-weight: 600;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: var(--accent-emerald-tint-strong);
+  border-color: var(--accent-emerald-bright);
+  color: var(--text-primary);
+}
+
+.btn-success:active:not(:disabled) {
+  background: var(--accent-emerald-tint-stronger);
+  transform: translateY(1px);
+}
+
+/* Button Sizing Modifiers */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-xs);
+}
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-xs);
+}
+
+/* ==========================================================================
+   GLOBAL FORM CONTROLS, SELECTS & DIGITAL READOUT FIELDS
+   ========================================================================== */
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-metallic);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  padding: 5px 8px;
+  border-radius: var(--radius-xs);
+  outline: none;
+  box-shadow: var(--shadow-inset);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus), inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   TACTILE RANGE SLIDERS (CLEAN TITANIUM SLIDER CHANNELS & KNOBS)
+   ========================================================================== */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--bg-inset);
+  border-radius: 2px;
+  outline: none;
+  margin: 6px 0;
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: background var(--transition-fast);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--slider-knob);
+  border: 1px solid var(--slider-knob-border);
+  cursor: grab;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--text-secondary);
+  border-color: var(--accent-neutral-bright);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  background: var(--text-primary);
+  border-color: var(--accent-neutral-bright);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--slider-knob);
+  border: 1px solid var(--slider-knob-border);
+  cursor: grab;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: var(--text-secondary);
+  border-color: var(--accent-neutral-bright);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  cursor: grabbing;
+  background: var(--text-primary);
+  border-color: var(--accent-neutral-bright);
+}
+
+/* ==========================================================================
+   STATUS & TELEMETRY BADGES (MONOSPACE / 3px CHAMFER)
+   ========================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  border-radius: var(--radius-xs);
+  letter-spacing: var(--letter-spacing-md);
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.badge-cyan {
+  background: rgba(226, 232, 240, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(226, 232, 240, 0.2);
+}
+
+.badge-amber {
+  background: var(--neon-amber-subtle);
+  color: var(--accent-amber-bright);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.badge-emerald {
+  background: var(--neon-emerald-subtle);
+  color: var(--accent-emerald-bright);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.badge-crimson {
+  background: var(--neon-crimson-subtle);
+  color: var(--accent-crimson-bright);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.badge-idle {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+/* ==========================================================================
+   KEYFRAME ANIMATIONS
+   ========================================================================== */
+
+@keyframes estop-flash {
+  0% {
+    opacity: 1;
+    background-color: var(--accent-crimson);
+  }
+  100% {
+    opacity: 0.85;
+    background-color: var(--accent-crimson-dark);
+  }
+}
+
+@keyframes pulse-stream {
+  0% {
+    border-color: rgba(16, 185, 129, 0.25);
+  }
+  100% {
+    border-color: rgba(16, 185, 129, 0.6);
+  }
+}
+
+@keyframes pulse-badge {
+  0% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.8;
+  }
+}
+}

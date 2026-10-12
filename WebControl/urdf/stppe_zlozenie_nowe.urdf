@@ -1,0 +1,314 @@
+<?xml version="1.0" ?>
+<robot name="stppe_zlozenie_nowe">
+
+<material name="silver_default">
+  <color rgba="0.700 0.700 0.700 1.000"/>
+</material>
+
+<material name="stal_satynowa">
+  <color rgba="0.750 0.750 0.780 1.000"/>
+</material>
+
+<material name="dark_gray">
+  <color rgba="0.250 0.250 0.250 1.000"/>
+</material>
+<transmission name="joint_1_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_1">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_1_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="joint_2_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_2">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_2_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="joint_3_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_3">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_3_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="joint_4_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_4">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_4_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="joint_5_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_5">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_5_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="joint_6_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="joint_6">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="joint_6_actr">
+    <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<!-- ======================================================================= -->
+<!-- BASE LINK                                                               -->
+<!-- ======================================================================= -->
+<link name="base_link">
+  <inertial>
+    <origin xyz="-0.015561 -0.188155 0.033809" rpy="0 0 0"/>
+    <mass value="8.4018"/>
+    <inertia ixx="0.0245766" iyy="0.0567997" izz="0.07138445" ixy="0.00117371" iyz="-3.651e-05" ixz="0.00186799"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 1 (Base Rotation, Z axis)                                         -->
+<!-- ======================================================================= -->
+<joint name="joint_1" type="revolute">
+  <origin xyz="-0.063538 -0.188851 0.062999" rpy="0 0 0.349066"/>
+  <parent link="base_link"/>
+  <child link="link_1"/>
+  <axis xyz="0 0 1"/>
+  <limit lower="-1.570796" upper="1.570796" effort="100" velocity="100"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 1 (Shoulder Turret)                                                -->
+<!-- ======================================================================= -->
+<link name="link_1">
+  <inertial>
+    <origin xyz="-0.031209 -0.093717 0.094619" rpy="0 0 0"/>
+    <mass value="3.4747"/>
+    <inertia ixx="0.00884839" iyy="0.0082063" izz="0.00700804" ixy="-8.5e-07" iyz="7.02e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.063538 0.188851 -0.062999" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.063538 0.188851 -0.062999" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 2 (Shoulder Pitch, Horizontal axis)                               -->
+<!-- ======================================================================= -->
+<joint name="joint_2" type="revolute">
+  <origin xyz="-0.003249 -0.008852 0.080897" rpy="0 0 0"/>
+  <parent link="link_1"/>
+  <child link="link_2"/>
+  <axis xyz="0.34202 0.939693 0"/>
+  <limit lower="-1.134464" upper="2.007129" effort="100" velocity="100"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 2 (Upper Arm / Przedramie Core)                                    -->
+<!-- ======================================================================= -->
+<link name="link_2">
+  <inertial>
+    <origin xyz="-0.028054 0.015475 0.068671" rpy="0 0 0"/>
+    <mass value="3.2829"/>
+    <inertia ixx="0.01477727" iyy="0.01378756" izz="0.00745895" ixy="-0.00039287" iyz="-0.00149172" ixz="0.00411533"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.066787 0.197703 -0.143896" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.066787 0.197703 -0.143896" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 3 (Elbow Pitch, Horizontal axis at elbow cylinder)                -->
+<!-- ======================================================================= -->
+<joint name="joint_3" type="revolute">
+  <origin xyz="-0.067852 0.043301 0.168419" rpy="0 0 0"/>
+  <parent link="link_2"/>
+  <child link="link_3"/>
+  <axis xyz="0.34202 0.939693 0"/>
+  <limit lower="-0.610865" upper="2.967060" effort="100" velocity="100"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 3 (Forearm Elbow Member / J3_main)                                 -->
+<!-- ======================================================================= -->
+<link name="link_3">
+  <inertial>
+    <origin xyz="-0.031284 0.003678 -0.001915" rpy="0 0 0"/>
+    <mass value="1.4185"/>
+    <inertia ixx="0.00162661" iyy="0.00240862" izz="0.00254871" ixy="0.00032212" iyz="6.956e-05" ixz="-0.0001549"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.134639 0.154402 -0.312315" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_3.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.134639 0.154402 -0.312315" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_3.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 4 (Forearm Roll Axis)                                             -->
+<!-- ======================================================================= -->
+<joint name="joint_4" type="revolute">
+  <origin xyz="-0.069455 0.016719 -0.023329" rpy="0 0 0"/>
+  <parent link="link_3"/>
+  <child link="link_4"/>
+  <axis xyz="0.3971 -0.1445 0.9063"/>
+  <limit lower="-1.570796" upper="1.570796" effort="100" velocity="100"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 4 (Forearm Roll Body / J4_main)                                    -->
+<!-- ======================================================================= -->
+<link name="link_4">
+  <inertial>
+    <origin xyz="-0.037542 0.00867 -0.077879" rpy="0 0 0"/>
+    <mass value="2.2154"/>
+    <inertia ixx="0.00732563" iyy="0.00632083" izz="0.00425711" ixy="-0.00046478" iyz="0.00060986" ixz="-0.00186362"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.204094 0.137683 -0.288986" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_4.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.204094 0.137683 -0.288986" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_4.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 5 (Wrist Pitch, Horizontal axis at wrist cylinder)                -->
+<!-- ======================================================================= -->
+<joint name="joint_5" type="revolute">
+  <origin xyz="-0.056864 0.055594 -0.150646" rpy="0 0 0"/>
+  <parent link="link_4"/>
+  <child link="link_5"/>
+  <axis xyz="0.34202 0.939693 0"/>
+  <limit lower="-1.570796" upper="1.570796" effort="100" velocity="100"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 5 (Wrist Body / J6_main)                                           -->
+<!-- ======================================================================= -->
+<link name="link_5">
+  <inertial>
+    <origin xyz="-0.008304 -0.032736 -0.000453" rpy="0 0 0"/>
+    <mass value="0.9829"/>
+    <inertia ixx="0.00050791" iyy="0.00040926" izz="0.00051564" ixy="-3.943e-05" iyz="-2.64e-06" ixz="2.14e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.260958 0.082089 -0.138340" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_5.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.260958 0.082089 -0.138340" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_5.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<!-- ======================================================================= -->
+<!-- JOINT 6 (Tool Flange Roll, Coaxial with output spindle)                 -->
+<!-- ======================================================================= -->
+<joint name="joint_6" type="continuous">
+  <origin xyz="-0.026461 -0.024525 0.001385" rpy="0 0 0"/>
+  <parent link="link_5"/>
+  <child link="link_6"/>
+  <axis xyz="0.9361 -0.3407 -0.0872"/>
+</joint>
+
+<!-- ======================================================================= -->
+<!-- LINK 6 (Tool Flange / J4_main_1)                                        -->
+<!-- ======================================================================= -->
+<link name="link_6">
+  <inertial>
+    <origin xyz="-0.000725 0.000167 -0.000012" rpy="0 0 0"/>
+    <mass value="0.0255"/>
+    <inertia ixx="9.1e-07" iyy="1.27e-06" izz="1.33e-06" ixy="1.7e-07" iyz="-1e-08" ixz="6e-08"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.287419 0.106614 -0.139725" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_6.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="stal_satynowa"/>
+  </visual>
+  <collision>
+    <origin xyz="0.287419 0.106614 -0.139725" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://stppe_zlozenie_nowe_description/meshes/link_6.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+</robot>
