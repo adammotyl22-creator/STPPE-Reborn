@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/stppe-banner.svg" alt="STPPE Reborn — Robot arm control and visualization" width="100%">
+  <img src="docs/assets/stppe-banner.png" alt="STPPE Reborn — Robot arm control and visualization" width="100%">
 </p>
 
 <p align="center">
