@@ -1,11 +1,11 @@
-# start_webcontrol.ps1 - PowerShell 1-Click Launcher for Teensy 4.1 Robot Arm Automation Studio
+# start_webcontrol.ps1 - PowerShell 1-Click Launcher for Teensy 4.1 Control Studio
 $ErrorActionPreference = "Continue"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -Path $ScriptDir
 
 Write-Host "========================================================================" -ForegroundColor Cyan
-Write-Host "🦾  TEENSY 4.1 ROBOT ARM AUTOMATION STUDIO (WEBCONTROL)" -ForegroundColor Cyan
+Write-Host "🦾  TEENSY 4.1 CONTROL STUDIO" -ForegroundColor Cyan
 Write-Host "========================================================================" -ForegroundColor Cyan
 Write-Host "Directory: $ScriptDir`n" -ForegroundColor DarkGray
 

@@ -1,7 +1,7 @@
 {
-  "name": "STPE Robot Arm Studio",
-  "short_name": "RobotArm",
-  "description": "Industrial 6-DOF Robot Arm CAD Automation & Control Studio",
+  "name": "Control Studio",
+  "short_name": "Control Studio",
+  "description": "Industrial 6-DOF Robot Arm CAD Automation Studio",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

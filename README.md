@@ -1,89 +1,121 @@
 <p align="center">
-  <img src="docs/assets/stppe-banner.png" alt="STPPE Reborn — Robot arm control and visualization" width="100%">
+  <img src="docs/assets/stppe-banner.png" alt="STPPE Reborn — six-axis robot arm and mechanical CAD details" width="100%">
 </p>
 
 <p align="center">
-  <strong>Teensy 4.1 firmware · Browser control · 3D visualization</strong>
+  <strong>Precision electronics work. A six-axis arm. One browser-based control studio.</strong><br>
+  <sub>Teensy 4.1 · 6 axes + gripper · CAD digital twin · Built-in simulator</sub>
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> &nbsp; / &nbsp;
-  <a href="WebControl/">WebControl</a> &nbsp; / &nbsp;
-  <a href="Firmware/Teensy_4.1/IK_Control/IK_Control.ino">Firmware</a> &nbsp; / &nbsp;
-  <a href="WebControl/PROJECT.md">Technical notes</a>
+  <a href="#try-it-without-a-robot">Try it locally</a> &nbsp; / &nbsp;
+  <a href="docs/GETTING_STARTED.md">Setup guide</a> &nbsp; / &nbsp;
+  <a href="docs/STPPE_SYSTEM_SPECIFICATION.md">System specification</a> &nbsp; / &nbsp;
+  <a href="docs/ROADMAP.md">Roadmap</a> &nbsp; / &nbsp;
+  <a href="CONTRIBUTING.md">Contribute</a>
 </p>
 
 ---
 
-## From joint motion to a full trajectory
+## A workbench for precise motion
 
-STPPE Reborn brings the firmware and browser control application for a six-axis robot arm into one project. WebControl combines a 3D view of the arm with joint controls, Cartesian positioning, trajectory editing, and telemetry.
+STPPE Reborn is a teleoperated robot arm project for delicate electronics servicing and micro-assembly. The aim is to turn hand-operated work under a microscope into controlled, repeatable motion: position a tool, inspect its target in 3D, and build a sequence you can replay.
 
-| Control | Visualize | Build sequences |
+**Control Studio** brings the robot's CAD model, Cartesian positioning, joint controls, trajectory editing, and telemetry into a browser. A built-in virtual controller lets you explore the software without owning the hardware. The frontend runs directly from source, with no build step.
+
+*STPPE: System Teleoperacyjny do Precyzyjnych Prac Elektronicznych.*
+
+| Position | See the motion | Build a sequence |
 | :--- | :--- | :--- |
-| Move individual joints and enter Cartesian targets. | Inspect the arm, target pose, and workspace in 3D. | Arrange motion steps in the trajectory timeline. |
-| Connect to the controller through Web Serial. | Follow telemetry and command output. | Explore the interface using the built-in simulator. |
+| Cartesian targets, individual joint controls, and wrist orientation presets. | CAD-based 3D arm, ghost target, workspace overlays, and camera presets. | Waypoint timeline, trajectory preview, and playback controls. |
+| Separate target preview and direct-drive modes. | Joint telemetry, tool position, and a command console. | Virtual hardware for experimenting before a bench session. |
 
-## WebControl preview
+## Control Studio preview
 
-[![WebControl dashboard showing Cartesian motion controls, the 3D robot arm, telemetry, and the command console](docs/assets/webcontrol-dashboard.png)](docs/assets/webcontrol-dashboard.png)
+[![Control Studio dashboard showing Cartesian motion controls, the 3D robot arm, telemetry, and the command console](docs/assets/webcontrol-dashboard.png)](docs/assets/webcontrol-dashboard.png)
 
-*The WebControl interface with the robot disconnected. Click the image to view it at full resolution.*
+*Control Studio with the robot disconnected: motion controls on the left, CAD viewport in the center, telemetry and console below. Click to inspect the full-resolution image.*
 
-## Quick start
+## Try it without a robot
 
-**1. Download the project** using GitHub's **Code → Download ZIP**, then extract it. Or clone it:
+You need **Python 3** and a browser with WebGL. Node.js is only needed to run the JavaScript tests.
 
 ```bash
 git clone https://github.com/adammotyl22-creator/STPPE-Reborn.git
 cd STPPE-Reborn
-```
-
-**2. Start WebControl** with Python 3 from the project folder:
-
-```bash
 python WebControl/launch.py
 ```
 
-The launcher opens your browser and prints the local address. It automatically chooses an available port. No frontend build or additional Python packages are needed.
+The launcher opens your browser and prints the local address. On Windows, `py` can replace `python`; on macOS/Linux, use `python3` if needed. You can also download and extract the repository using **Code → Download ZIP**.
 
-**3. Explore the interface**, or connect your controller using a browser that supports Web Serial. The firmware source is in [`Firmware/Teensy_4.1/IK_Control/`](Firmware/Teensy_4.1/IK_Control/).
+1. Click the **DISCONNECTED** status pill to open connection settings.
+2. Enable **Mock**, then click **Connect** to use the virtual controller.
+3. In **Target (IK)**, adjust a target and inspect the amber ghost arm. Use **Send to Target (PTP)** to move the simulated arm to it.
+4. Open **Sequencer** to explore waypoint editing, then inspect telemetry and the command console.
 
-## Inside the repository
+No frontend build, npm install, or additional Python packages are required for this walkthrough. Keep the launcher running; press `Ctrl+C` in its terminal when finished.
 
-| Area | What you will find |
+For USB connection, LAN viewing, and troubleshooting, follow the [setup guide](docs/GETTING_STARTED.md).
+
+## From browser to workbench
+
+```mermaid
+flowchart LR
+    studio["Control Studio<br/>Targets · 3D CAD · Sequences"]
+    simulator["Virtual controller<br/>Explore without hardware"]
+    teensy["Teensy 4.1<br/>Motion firmware"]
+    arm["Robot arm<br/>6 joints + gripper"]
+    studio <-->|Mock connection| simulator
+    studio <-->|USB / Web Serial| teensy
+    teensy -->|TMC2209 drivers + servo| arm
+```
+
+The browser contains a Wi-Fi/WebSocket transport option as well. It requires a separate compatible bridge; the Python launcher serves the interface and does not relay USB commands. The custom handheld pendant and bridge deployment are part of the [roadmap](docs/ROADMAP.md).
+
+## Project status
+
+| Area | Current position |
 | :--- | :--- |
-| [`WebControl/`](WebControl/) | Browser application, styles, JavaScript modules, and launcher |
-| [`Firmware/Teensy_4.1/`](Firmware/Teensy_4.1/) | Robot controller firmware |
-| [`WebControl/meshes/`](WebControl/meshes/) · [`WebControl/urdf/`](WebControl/urdf/) | Robot geometry used by the 3D viewer |
-| [`WebControl/tests/`](WebControl/tests/) | Automated checks for WebControl |
-| [`WebControl/PROJECT.md`](WebControl/PROJECT.md) | Architecture and implementation notes |
+| Control Studio | Browser application, CAD assets, simulator, and automated tests are in this repository. |
+| Software checks | **562/562 assertions passed** in the main Node.js suite on 2026-10-13; the Python server smoke check also passed. These are local results, not a CI badge. |
+| Physical hardware | The system specification describes an open-loop build with no installed encoders. Firmware alignment and bench validation remain roadmap work. |
+| Precision and cost | ≤ 0.5 mm tool-tip positioning and a budget below 2000 PLN are **design targets**, not measured results published here. |
 
-## Open on another device
+The specification includes intended behavior that is not yet implemented. In particular, the current firmware has no `ENABLE_ENCODERS` / `MANUAL_HOMING` configuration flags, and bare `HOME` starts switch homing. Read the [hardware status notes](docs/GETTING_STARTED.md#connecting-physical-hardware) before using the setup as a hardware guide.
 
-To open the interface on a phone or another computer on the same trusted Wi-Fi network:
+## Next milestones
+
+1. **Align firmware with the physical build** — explicit encoder and homing modes, documented command behavior, and a reproducible build.
+2. **Publish bench evidence** — axis calibration, repeatability measurements, and a recorded motion demonstration.
+3. **Make the project easier to reproduce** — wiring, bill of materials, assembly notes, and automated software checks.
+4. **Extend teleoperation** — a dedicated teach pendant and a documented wireless bridge.
+
+See the [full roadmap and completion criteria](docs/ROADMAP.md).
+
+## Explore the repository
+
+| Start here | What you will find |
+| :--- | :--- |
+| [Setup guide](docs/GETTING_STARTED.md) | Simulator walkthrough, connection options, and troubleshooting |
+| [System specification](docs/STPPE_SYSTEM_SPECIFICATION.md) | Mechanical dimensions, electronics, intended behavior, and implementation caveats |
+| [Control Studio](WebControl/) | Browser application, JavaScript modules, styles, and launcher |
+| [Teensy firmware](Firmware/Teensy_4.1/IK_Control/IK_Control.ino) | Controller sketch and command handling |
+| [Robot geometry](WebControl/urdf/) · [CAD meshes](WebControl/meshes/) | Model definition and geometry used by the viewer |
+| [Tests](WebControl/tests/) | Main automated suite and additional focused checks |
+| [Contributing](CONTRIBUTING.md) | How to report a problem, propose a feature, or submit a change |
+
+## Run the checks
+
+From the repository root:
 
 ```bash
-python WebControl/launch.py --lan
+node WebControl/tests/run_tests_node.js
+python WebControl/tests/test_server.py
 ```
 
-Open the printed **Phone URL** on the other device. If Windows Firewall asks, allow Python on private networks. Keep the host computer and launcher running.
+The first command checks application logic, protocol handling, kinematics, and UI contracts. The second checks that the local server serves the main application assets. Neither establishes physical positioning accuracy or verifies a firmware build.
 
-The LAN launcher serves the interface files; it does not relay the host computer's USB connection. Hardware control still depends on Web Serial support on the device running the browser. Without `--lan`, the interface is accessible only on the host computer.
-
-<details>
-<summary><strong>Development · run the WebControl checks</strong></summary>
-
-With Node.js and npm installed:
-
-```bash
-cd WebControl
-npm test
-```
-
-On Windows PowerShell, use `npm.cmd test` if script execution policy blocks `npm`.
-
-</details>
+Have a reproducible bug or a useful improvement? [Open an issue](https://github.com/adammotyl22-creator/STPPE-Reborn/issues) with your setup and the behavior you observed. Documentation, simulator feedback, and measured bench results are useful contributions too.
 
 ---
 

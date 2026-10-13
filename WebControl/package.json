@@ -1,7 +1,7 @@
 {
   "name": "teensy41-robot-arm-webcontrol",
   "version": "1.0.0",
-  "description": "6-DOF Robot Arm WebControl Automation Studio for Teensy 4.1",
+  "description": "6-DOF Robot Arm Control Studio for Teensy 4.1",
   "type": "module",
   "scripts": {
     "test": "node tests/run_tests_node.js"

@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
-title Teensy 4.1 Robot Arm Automation Studio
+title Teensy 4.1 Control Studio
 cd /d "%~dp0"
 
 echo ========================================================================
-echo 🦾  TEENSY 4.1 ROBOT ARM AUTOMATION STUDIO (WEBCONTROL)
+echo 🦾  TEENSY 4.1 CONTROL STUDIO
 echo ========================================================================
 echo Initializing standalone web server...
 echo.

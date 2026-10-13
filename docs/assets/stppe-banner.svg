@@ -13,7 +13,7 @@
   <text x="58" y="211" fill="#a8bace" font-family="Arial,Helvetica,sans-serif" font-size="23">Robot arm control and visualization.</text>
   <path d="M58 249H632" stroke="#2d4054"/>
   <g fill="#c6d4e3" font-family="Arial,Helvetica,sans-serif" font-size="14" letter-spacing="1.5">
-    <text x="58" y="286">TEENSY 4.1</text><text x="223" y="286">WEB CONTROL</text><text x="424" y="286">6 AXES</text>
+    <text x="58" y="286">TEENSY 4.1</text><text x="223" y="286">CONTROL STUDIO</text><text x="470" y="286">6 AXES</text>
   </g>
   <text x="58" y="348" fill="#71869b" font-family="Arial,Helvetica,sans-serif" font-size="13" letter-spacing="2">POSITION. VISUALIZE. SEQUENCE.</text>
   <g fill="none" stroke-linecap="round" stroke-linejoin="round">

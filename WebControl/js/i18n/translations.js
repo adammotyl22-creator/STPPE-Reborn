@@ -1,6 +1,6 @@
 /**
  * translations.js - Internationalization Dictionary
- * English (EN) and Polish (PL) translations for the Robot Arm WebControl UI
+ * English (EN) and Polish (PL) translations for the Control Studio UI
  *
  * Polish translation guidelines:
  * - Technical terms kept in English where standard (e.g. "TCP", "IK", "FK", "Hz")
@@ -14,8 +14,8 @@ export const LANGUAGES = ['en', 'pl'];
 export const translations = {
 
   // ── HEADER ───────────────────────────────────────────────────────────────────
-  'header.brand.title': { en: 'ROBOT ARM',  pl: 'RAMIĘ ROBOTA' },
-  'header.brand.sub':   { en: 'CONTROL',    pl: 'STEROWANIE' },
+  'header.brand.title': { en: 'CONTROL STUDIO',  pl: 'CONTROL STUDIO' },
+  'header.brand.sub':   { en: 'CONTROL',         pl: 'STEROWANIE' },
   'header.connect':     { en: 'Connect',    pl: 'Połącz' },
   'header.disconnect':  { en: 'Disconnect', pl: 'Rozłącz' },
   'header.transport.usb':       { en: 'USB',              pl: 'USB' },

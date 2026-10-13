@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 launch.py - Standalone Cross-Platform Web Server & Browser Launcher
-Teensy 4.1 6-DOF Robot Arm Automation Studio (WebControl)
+Teensy 4.1 6-DOF Robot Arm Control Studio
 
 Features:
 - Pure standard library Python 3 (zero external pip dependencies)
@@ -79,15 +79,15 @@ def get_lan_ip():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Launch WebControl locally.')
+    parser = argparse.ArgumentParser(description='Launch Control Studio locally.')
     parser.add_argument(
         '--lan',
         action='store_true',
-        help='Allow other devices on the local network to open WebControl'
+        help='Allow other devices on the local network to open Control Studio'
     )
     args = parser.parse_args()
 
-    # Set current working directory to this script's directory (WebControl)
+    # Set current working directory to this script's directory (Control Studio)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_dir)
 
@@ -97,7 +97,7 @@ def main():
     url = f"http://localhost:{port}/"
 
     print("=" * 70)
-    print("  TEENSY 4.1 ROBOT ARM AUTOMATION STUDIO - WEB SERVER LAUNCHER")
+    print("  TEENSY 4.1 CONTROL STUDIO - WEB SERVER LAUNCHER")
     print("=" * 70)
     print(f"Serving directory : {script_dir}")
     print(f"Local URL          : {url}")
@@ -124,7 +124,7 @@ def main():
         httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down WebControl server... Goodbye!")
+        print("\nShutting down Control Studio server... Goodbye!")
         sys.exit(0)
 
 
