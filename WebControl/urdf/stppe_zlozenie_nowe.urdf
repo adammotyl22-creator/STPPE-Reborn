@@ -250,7 +250,7 @@
   <parent link="link_4"/>
   <child link="link_5"/>
   <axis xyz="0.34202 0.939693 0"/>
-  <limit lower="-1.570796" upper="1.570796" effort="100" velocity="100"/>
+  <limit lower="-2.094395" upper="2.094395" effort="100" velocity="100"/>
 </joint>
 
 <!-- ======================================================================= -->

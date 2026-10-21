@@ -45,7 +45,6 @@ export class WorkspaceVisualizer {
     this._initFloorGrid();
     this._initFloorClearancePlane();
     this._initBaseExclusionCylinder();
-    this._initReachEnvelope();
     this._initWorldAxes();
   }
 
@@ -119,7 +118,7 @@ export class WorkspaceVisualizer {
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x64748b,
         transparent: true,
-        opacity: 0.20,
+        opacity: 0.22,
         side: THREE.DoubleSide
       });
       const ringMesh = new THREE.Mesh(ringGeo, ringMat);
@@ -128,12 +127,42 @@ export class WorkspaceVisualizer {
       this.gridGroup.add(ringMesh);
     });
 
-    // 4. Maximum physical reach boundary ring (443mm envelope perimeter)
-    const maxReachGeo = new THREE.RingGeometry(MAX_REACH_RADIUS - 1.0, MAX_REACH_RADIUS + 1.0, 96);
-    const maxReachMat = new THREE.MeshBasicMaterial({
-      color: 0x00d9e6, // Cyan reach perimeter accent
+    // 3b. Cardinal & Intercardinal Polar Degree Ticks (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
+    const tickVertices = [];
+    for (let deg = 0; deg < 360; deg += 45) {
+      const rad = (deg * Math.PI) / 180;
+      const isCardinal = (deg % 90 === 0);
+      const cosA = Math.cos(rad);
+      const sinA = Math.sin(rad);
+
+      // Radial spoke ticks crossing each 100mm ring and outer boundary
+      [100, 200, 300, 400, MAX_REACH_RADIUS].forEach((ringR) => {
+        const halfLen = isCardinal ? 8 : 4.5;
+        const rInner = ringR - halfLen;
+        const rOuter = ringR + halfLen;
+        tickVertices.push(
+          cosA * rInner, 0.24, sinA * rInner,
+          cosA * rOuter, 0.24, sinA * rOuter
+        );
+      });
+    }
+    const tickGeo = new THREE.BufferGeometry();
+    tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickVertices, 3));
+    const tickMat = new THREE.LineBasicMaterial({
+      color: 0x94a3b8,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.38
+    });
+    const tickLines = new THREE.LineSegments(tickGeo, tickMat);
+    tickLines.name = 'PolarCardinalTicks';
+    this.gridGroup.add(tickLines);
+
+    // 4. Maximum physical reach boundary ring (443mm envelope perimeter in calibrated titanium)
+    const maxReachGeo = new THREE.RingGeometry(MAX_REACH_RADIUS - 1.1, MAX_REACH_RADIUS + 1.1, 96);
+    const maxReachMat = new THREE.MeshBasicMaterial({
+      color: 0xe2e8f0, // Soft Titanium reach perimeter accent
+      transparent: true,
+      opacity: 0.32,
       side: THREE.DoubleSide
     });
     const maxReachMesh = new THREE.Mesh(maxReachGeo, maxReachMat);

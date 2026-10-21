@@ -24,7 +24,7 @@ export class CameraController {
     this.devices = [];
     this.selectedDeviceId = '';
     this.isActive = false;
-    this.isPipVisible = true;
+    this.isPipVisible = false;
     this.pipMode = 'minimized';
     this.fps = 0;
     this._frameCount = 0;
@@ -61,6 +61,14 @@ export class CameraController {
     this._domBound = false;
     this._snapshots = [];
 
+    // Dedicated downscaled auxiliary canvas & throttle state for Color Blob Tracking (avoids GPU ReadPixels stall)
+    this._trackingCanvas = null;
+    this._trackingCtx = null;
+    this._trackingWidth = 160;
+    this._trackingHeight = 90;
+    this._lastTrackingTimestamp = 0;
+    this._trackingIntervalMs = 1000 / 12; // ~12 FPS throttle (within 10–15 FPS range)
+
     // Initialize hidden offscreen video element
     if (typeof document !== 'undefined') {
       this.videoElement = document.createElement('video');
@@ -78,6 +86,7 @@ export class CameraController {
   async init() {
     this._loadSavedPreferences();
     this.bindDom();
+    this.setPipVisible(this.isPipVisible);
     await this.enumerateDevices();
   }
 
@@ -169,6 +178,10 @@ export class CameraController {
       this.videoElement.srcObject = null;
     }
     this.isActive = false;
+    this._lastTrackingTimestamp = 0;
+    if (this.config && this.config.colorTracking) {
+      this.config.colorTracking.detected = false;
+    }
     this._stopRenderLoop();
     this._updateStatusUI();
   }
@@ -247,6 +260,14 @@ export class CameraController {
     if (this.pipContainer) {
       this.pipContainer.style.display = this.isPipVisible ? 'flex' : 'none';
     }
+    const minBadge = (typeof document !== 'undefined') ? document.getElementById('camera-pip-minimized-badge') : null;
+    if (minBadge) {
+      if (!this.isPipVisible) {
+        minBadge.classList.add('hidden');
+      } else if (this.pipMode === 'minimized') {
+        minBadge.classList.remove('hidden');
+      }
+    }
     const chkToggle = (typeof document !== 'undefined') ? document.getElementById('chk-camera-pip-toggle') : null;
     if (chkToggle) {
       chkToggle.checked = this.isPipVisible;
@@ -308,7 +329,7 @@ export class CameraController {
 
     snapCanvas.width = width;
     snapCanvas.height = height;
-    const ctx = snapCanvas.getContext('2d');
+    const ctx = snapCanvas.getContext('2d', { willReadFrequently: true });
 
     // Draw transformed video frame
     this._drawFrameToContext(ctx, width, height, true);
@@ -427,7 +448,7 @@ export class CameraController {
    */
   _renderCanvas(canvas) {
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const width = canvas.width;
     const height = canvas.height;
 
@@ -638,71 +659,110 @@ export class CameraController {
   }
 
   /**
-   * Fast canvas color blob tracking
+   * Fast canvas color blob tracking with 10–15 FPS throttling and 160x90 downscaling
+   * to eliminate GPU ReadPixels pipeline stalls on high-resolution canvas.
    * @private
    */
   _processColorTracking(ctx, width, height) {
     try {
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const data = imgData.data;
-
-      let sumX = 0;
-      let sumY = 0;
-      let count = 0;
-
-      // Extract RGB targets
-      const targetHex = this.config.colorTracking.targetColor || '#ef4444';
-      const tr = parseInt(targetHex.slice(1, 3), 16) || 239;
-      const tg = parseInt(targetHex.slice(3, 5), 16) || 68;
-      const tb = parseInt(targetHex.slice(5, 7), 16) || 68;
-      const tol = this.config.colorTracking.tolerance || 35;
-
-      // Fast stride sampling
-      const stride = 4;
-      for (let y = 0; y < height; y += stride) {
-        for (let x = 0; x < width; x += stride) {
-          const idx = (y * width + x) * 4;
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-
-          const diff = Math.sqrt((r - tr) ** 2 + (g - tg) ** 2 + (b - tb) ** 2);
-          if (diff < tol * 3) {
-            sumX += x;
-            sumY += y;
-            count++;
-          }
-        }
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (now - this._lastTrackingTimestamp >= this._trackingIntervalMs) {
+        this._lastTrackingTimestamp = now;
+        this._analyzeColorBlob(ctx.canvas, width, height);
       }
 
-      const tracking = this.config.colorTracking;
-      if (count > 20) {
-        tracking.detected = true;
-        tracking.cx = Math.round(sumX / count);
-        tracking.cy = Math.round(sumY / count);
-        tracking.dx = tracking.cx - width / 2;
-        tracking.dy = tracking.cy - height / 2;
-
-        // Draw target bounding box
-        ctx.save();
-        ctx.strokeStyle = '#22c55e'; // Green
-        ctx.lineWidth = 2;
-        ctx.strokeRect(tracking.cx - 20, tracking.cy - 20, 40, 40);
-
-        ctx.fillStyle = '#22c55e';
-        ctx.beginPath();
-        ctx.arc(tracking.cx, tracking.cy, 4, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.font = '10px monospace';
-        ctx.fillText(`LOCKED (dx:${tracking.dx}, dy:${tracking.dy})`, tracking.cx + 25, tracking.cy);
-        ctx.restore();
-      } else {
-        tracking.detected = false;
+      // Draw tracking locked overlay if detected
+      if (this.config.colorTracking.detected) {
+        this._drawColorTrackingOverlay(ctx, width, height);
       }
     } catch (e) {
       // Ignore context read limits if any
     }
+  }
+
+  /**
+   * Runs color detection on downscaled auxiliary canvas (160x90) with willReadFrequently: true
+   * @private
+   */
+  _analyzeColorBlob(sourceCanvas, fullWidth, fullHeight) {
+    if (!this._trackingCanvas && typeof document !== 'undefined') {
+      this._trackingCanvas = document.createElement('canvas');
+      this._trackingCanvas.width = this._trackingWidth;
+      this._trackingCanvas.height = this._trackingHeight;
+      this._trackingCtx = this._trackingCanvas.getContext('2d', { willReadFrequently: true });
+    }
+
+    if (!this._trackingCtx) return;
+
+    // Fast GPU downscale from full source resolution into 160x90 auxiliary buffer
+    this._trackingCtx.drawImage(sourceCanvas, 0, 0, this._trackingWidth, this._trackingHeight);
+    const imgData = this._trackingCtx.getImageData(0, 0, this._trackingWidth, this._trackingHeight);
+    const data = imgData.data;
+
+    let sumX = 0;
+    let sumY = 0;
+    let count = 0;
+
+    // Extract RGB targets
+    const targetHex = this.config.colorTracking.targetColor || '#ef4444';
+    const tr = parseInt(targetHex.slice(1, 3), 16) || 239;
+    const tg = parseInt(targetHex.slice(3, 5), 16) || 68;
+    const tb = parseInt(targetHex.slice(5, 7), 16) || 68;
+    const tol = this.config.colorTracking.tolerance || 35;
+
+    // Fast stride sampling on downscaled 160x90 buffer
+    const stride = 2;
+    for (let y = 0; y < this._trackingHeight; y += stride) {
+      for (let x = 0; x < this._trackingWidth; x += stride) {
+        const idx = (y * this._trackingWidth + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        const diff = Math.sqrt((r - tr) ** 2 + (g - tg) ** 2 + (b - tb) ** 2);
+        if (diff < tol * 3) {
+          sumX += x;
+          sumY += y;
+          count++;
+        }
+      }
+    }
+
+    const tracking = this.config.colorTracking;
+    if (count >= 4) {
+      tracking.detected = true;
+      const scaleX = fullWidth / this._trackingWidth;
+      const scaleY = fullHeight / this._trackingHeight;
+      tracking.cx = Math.round((sumX / count) * scaleX);
+      tracking.cy = Math.round((sumY / count) * scaleY);
+      tracking.dx = tracking.cx - Math.round(fullWidth / 2);
+      tracking.dy = tracking.cy - Math.round(fullHeight / 2);
+    } else {
+      tracking.detected = false;
+    }
+  }
+
+  /**
+   * Draws target bounding box and locked coordinates HUD on the rendered canvas
+   * @private
+   */
+  _drawColorTrackingOverlay(ctx, width, height) {
+    const tracking = this.config.colorTracking;
+    if (!tracking || !tracking.detected) return;
+
+    ctx.save();
+    ctx.strokeStyle = '#22c55e'; // Green
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tracking.cx - 20, tracking.cy - 20, 40, 40);
+
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(tracking.cx, tracking.cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.font = '10px monospace';
+    ctx.fillText(`LOCKED (dx:${tracking.dx}, dy:${tracking.dy})`, tracking.cx + 25, tracking.cy);
+    ctx.restore();
   }
 
   /**

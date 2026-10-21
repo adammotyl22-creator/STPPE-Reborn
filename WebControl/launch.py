@@ -44,7 +44,7 @@ class CustomHTTPRequestHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # Security & isolation headers for modern Web APIs (WebSerial, SharedArrayBuffer)
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
-        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
+        self.send_header('Cross-Origin-Embedder-Policy', 'credentialless')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 

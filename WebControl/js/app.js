@@ -213,6 +213,10 @@ export class RobotArmApp {
     // 6. Initialize Bottom Dock: Telemetry Charts & Console Terminal
     this._initBottomDock();
 
+    // Bind layout controls before camera device enumeration can delay startup.
+    this._initPanelToggles();
+    this._initFocusView();
+
     // 7. Initialize Eye-in-Hand USB Vision Camera Controller
     const pipHud = (typeof document !== 'undefined') ? document.getElementById('camera-hud-container') : null;
     const dockVision = (typeof document !== 'undefined') ? document.getElementById('vision-split-container') : null;
@@ -229,8 +233,7 @@ export class RobotArmApp {
       }
     }
 
-    // 8. Initialize CAD Dock Panel Collapse/Expand Handlers & Accordions
-    this._initPanelToggles();
+    // 8. Initialize CAD Dock Panel Accordions
     this._initAccordions();
 
     // 8b. Initialize Native Gamepad Controller
@@ -268,6 +271,7 @@ export class RobotArmApp {
 
     if (leftPanel && btnLeftCollapse) {
       btnLeftCollapse.addEventListener('click', () => {
+        this._leaveFocusView(true);
         leftPanel.classList.add('panel-collapsed');
         this._handleLayoutResize();
       });
@@ -275,6 +279,7 @@ export class RobotArmApp {
 
     if (leftPanel && btnLeftExpand) {
       btnLeftExpand.addEventListener('click', () => {
+        this._leaveFocusView(true);
         leftPanel.classList.remove('panel-collapsed');
         this._handleLayoutResize();
       });
@@ -298,6 +303,64 @@ export class RobotArmApp {
         this._handleLayoutResize();
       });
     }
+  }
+
+  /** Temporarily gives the viewport the space occupied by the controls and dock. */
+  _initFocusView() {
+    const button = document.getElementById('btn-focus-view');
+    const leftPanel = document.getElementById('left-panel');
+    const bottomDock = document.getElementById('bottom-dock');
+    if (!button || !leftPanel || !bottomDock) return;
+
+    button.addEventListener('click', () => {
+      if (this._focusViewState) {
+        this._leaveFocusView(true);
+        return;
+      }
+      this._focusViewState = {
+        leftCollapsed: leftPanel.classList.contains('panel-collapsed'),
+        dockCollapsed: bottomDock.classList.contains('dock-collapsed')
+      };
+      leftPanel.classList.add('panel-collapsed', 'focus-view-collapsed');
+      bottomDock.classList.add('dock-collapsed', 'focus-view-collapsed');
+      this._updateFocusViewButton();
+      const dockToggle = document.getElementById('btn-dock-toggle');
+      if (dockToggle) dockToggle.textContent = i18n.t('dock.expand');
+      this._handleLayoutResize();
+    });
+    this._updateFocusViewButton();
+  }
+
+  _updateFocusViewButton() {
+    const button = document.getElementById('btn-focus-view');
+    if (!button) return;
+    const active = Boolean(this._focusViewState);
+    const label = i18n.t(active ? 'viewport.restore' : 'viewport.focus');
+    button.setAttribute('aria-pressed', String(active));
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    const text = button.querySelector('.focus-view-label');
+    if (text) text.textContent = label;
+  }
+
+  _leaveFocusView(restore) {
+    if (!this._focusViewState) return;
+    const { leftCollapsed, dockCollapsed } = this._focusViewState;
+    this._focusViewState = null;
+    const leftPanel = document.getElementById('left-panel');
+    const bottomDock = document.getElementById('bottom-dock');
+    leftPanel?.classList.remove('focus-view-collapsed');
+    bottomDock?.classList.remove('focus-view-collapsed');
+    if (restore) {
+      leftPanel?.classList.toggle('panel-collapsed', leftCollapsed);
+      bottomDock?.classList.toggle('dock-collapsed', dockCollapsed);
+    }
+    this._updateFocusViewButton();
+    const dockToggle = document.getElementById('btn-dock-toggle');
+    if (dockToggle && bottomDock) {
+      dockToggle.textContent = i18n.t(bottomDock.classList.contains('dock-collapsed') ? 'dock.expand' : 'dock.collapse');
+    }
+    this._handleLayoutResize();
   }
 
   _initMobileOptimizationsToggle() {
@@ -396,10 +459,16 @@ export class RobotArmApp {
         t.classList.toggle('active', isCurrent);
         t.setAttribute('aria-selected', String(isCurrent));
       });
+      if (this.motionController) {
+        this.motionController.setControlModeTab(initialKey);
+      }
     }
     modeTabs.forEach(tabBtn => {
       tabBtn.addEventListener('click', () => {
         const targetMode = tabBtn.getAttribute('data-mode-tab');
+        if (this.motionController) {
+          this.motionController.setControlModeTab(targetMode);
+        }
         modeTabs.forEach(t => {
           const isCurrent = t === tabBtn;
           t.classList.toggle('active', isCurrent);
@@ -468,7 +537,16 @@ export class RobotArmApp {
 
     // Bind Interactive 3D TCP Drag & Drop to MotionController IK
     this.visualizer.onTcpDrag = (coords) => {
-      if (this.motionController) {
+      if (!this.motionController || !coords) return;
+      if (coords.pitch !== undefined) {
+        this.motionController.setOrientationTarget('pitch', coords.pitch, true, false);
+      } else if (coords.roll !== undefined) {
+        this.motionController.setOrientationTarget('roll', coords.roll, true, false);
+      } else if (coords.pitchDelta !== undefined) {
+        this.motionController.nudgeOrientation('pitch', coords.pitchDelta, false);
+      } else if (coords.rollDelta !== undefined) {
+        this.motionController.nudgeOrientation('roll', coords.rollDelta, false);
+      } else {
         this.motionController.setCartesianTarget(
           coords.x,
           coords.y,
@@ -492,10 +570,10 @@ export class RobotArmApp {
       if (live && this.visualizer) {
         this.visualizer.updateLivePose(
           Number(live.j1 ?? 0),
-          Number(live.j2 ?? -90),
-          Number(live.j3 ?? 90),
-          Number(live.j4 ?? 90),
-          Number(live.j5 ?? 90),
+          Number(live.j2 ?? 0),
+          Number(live.j3 ?? 0),
+          Number(live.j4 ?? 0),
+          Number(live.j5 ?? 0),
           Number(live.j6 ?? 0),
           Number(live.grip ?? 0)
         );
@@ -504,25 +582,55 @@ export class RobotArmApp {
     this.appState.subscribe('telemetry:updated', updateLive);
     this.appState.subscribe('stateChange:livePose', updateLive);
 
-    // Active Status Feedback: Breathing pulse on 3D Viewport when robot is in motion
+    // Active Status Feedback: Breathing pulse & Mode-Aware Perimeter Framing on 3D Viewport
     const viewportContainer = document.getElementById('viewport-container');
+    let isFloorBreach = false;
+    const syncViewportPerimeter = () => {
+      if (!viewportContainer) return;
+      const isEstop = Boolean(this.appState.getState('safety.estop'));
+      const execMode = this.appState.getState('executionMode.mode') ||
+        (this.motionController && this.motionController.executionMode) ||
+        'preview';
+      const isDirect = (execMode === 'direct_drive' && (!this.motionController || this.motionController.isArmed));
+      viewportContainer.classList.toggle('mode-estop', isEstop);
+      viewportContainer.classList.toggle('mode-floor-breach', !isEstop && isFloorBreach);
+      viewportContainer.classList.toggle('mode-direct-drive', !isEstop && !isFloorBreach && isDirect);
+      viewportContainer.classList.toggle('mode-preview', !isEstop && !isFloorBreach && !isDirect);
+    };
+    syncViewportPerimeter();
+
     const updateMotionPulse = (telem) => {
       if (viewportContainer) {
         const isMoving = Boolean(telem && (telem.isMoving || (typeof telem.status === 'string' && telem.status.toUpperCase() === 'MOVING')));
         viewportContainer.classList.toggle('robot-moving', isMoving);
+        if (telem && telem.z !== undefined) {
+          isFloorBreach = Number(telem.z) <= 20;
+        }
+        syncViewportPerimeter();
       }
     };
     this.appState.subscribe('telemetry:updated', updateMotionPulse);
+    this.appState.subscribe('safety:estop', syncViewportPerimeter);
+    this.appState.subscribe('executionMode:changed', syncViewportPerimeter);
+    this.appState.subscribe('stateChange:executionMode', syncViewportPerimeter);
+
+    // 2D <-> 3D Joint Hover Highlighting
+    const onHighlightJoint = (joint) => {
+      if (this.visualizer && typeof this.visualizer.setHighlightedJoint === 'function') {
+        this.visualizer.setHighlightedJoint(joint);
+      }
+    };
+    this.appState.subscribe('ui:highlightJoint', onHighlightJoint);
 
     // Update Ghost Target Arm Pose on Motion/IK Changes
     const updateGhost = (ghost) => {
       if (ghost && this.visualizer) {
         this.visualizer.updateGhostPose(
           Number(ghost.j1 ?? 0),
-          Number(ghost.j2 ?? -90),
-          Number(ghost.j3 ?? 90),
-          Number(ghost.j4 ?? 90),
-          Number(ghost.j5 ?? 90),
+          Number(ghost.j2 ?? 0),
+          Number(ghost.j3 ?? 0),
+          Number(ghost.j4 ?? 0),
+          Number(ghost.j5 ?? 0),
           Number(ghost.j6 ?? 0),
           Number(ghost.grip ?? 0)
         );
@@ -608,6 +716,11 @@ export class RobotArmApp {
     }
 
     // 3D Layer visibility toggles
+    const chkLive = document.getElementById('chk-live-visible');
+    if (chkLive) {
+      chkLive.addEventListener('change', (e) => this.visualizer.setLiveVisible(e.target.checked));
+    }
+
     const chkGhost = document.getElementById('chk-ghost-visible');
     if (chkGhost) {
       chkGhost.addEventListener('change', (e) => this.visualizer.setGhostVisible(e.target.checked));
@@ -775,7 +888,7 @@ export class RobotArmApp {
 
     // 1. Restore Active Dock Tab from storage (default: 'split')
     const savedTab = this._getItem(STORAGE_KEYS.DOCK_ACTIVE_TAB);
-    if (savedTab && ['split', 'telemetry', 'console'].includes(savedTab)) {
+    if (savedTab && ['split', 'telemetry', 'console', 'vision', 'timeline'].includes(savedTab)) {
       switchTab(savedTab, false);
     }
 
@@ -799,7 +912,11 @@ export class RobotArmApp {
 
     if (bottomDock && btnDockToggle) {
       btnDockToggle.addEventListener('click', () => {
-        const isCollapsed = bottomDock.classList.toggle('dock-collapsed');
+        const wasFocused = Boolean(this._focusViewState);
+        this._leaveFocusView(true);
+        // Focus shows the dock as collapsed; its visible action is always Expand.
+        const isCollapsed = wasFocused ? false : bottomDock.classList.toggle('dock-collapsed');
+        if (wasFocused) bottomDock.classList.remove('dock-collapsed');
         btnDockToggle.textContent = isCollapsed ? i18n.t('dock.expand') : i18n.t('dock.collapse');
         this._setItem(STORAGE_KEYS.DOCK_COLLAPSED, isCollapsed ? 'true' : 'false');
         this._handleLayoutResize();
@@ -819,6 +936,7 @@ export class RobotArmApp {
         leftPanel.classList.toggle('settings-view', view === 'settings');
         leftPanel.classList.toggle('motion-view', view === 'motion');
         leftPanel.classList.toggle('program-view', view === 'program');
+        leftPanel.classList.toggle('io-view', view === 'io');
       }
       if (view === 'settings') {
         const motionEngineCard = document.getElementById('card-motion-engine');
@@ -835,6 +953,8 @@ export class RobotArmApp {
 
     workspaceNavBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
+        this._leaveFocusView(true);
+        document.getElementById('left-panel')?.classList.remove('panel-collapsed');
         const view = btn.getAttribute('data-workspace-view');
         setWorkspaceView(view);
 
@@ -844,7 +964,7 @@ export class RobotArmApp {
           document.querySelector('[data-mode-tab="trajectory"]')?.click();
           openDockView('timeline');
         } else if (view === 'io') {
-          openDockView('console');
+          // Dedicated hardware I/O workspace; left clean for actual digital/analog I/O
         } else if (view === 'status') {
           openDockView('telemetry');
         }
@@ -873,7 +993,6 @@ export class RobotArmApp {
         const tab = btn.getAttribute('data-dock-tab');
         if (tab === 'timeline') setWorkspaceView('program');
         else if (tab === 'telemetry') setWorkspaceView('status');
-        else if (tab === 'console' || tab === 'vision' || tab === 'split') setWorkspaceView('io');
       });
     });
   }
@@ -938,6 +1057,8 @@ export class RobotArmApp {
           el.setAttribute('title', i18n.t(key));
         }
       });
+
+      this._updateFocusViewButton();
 
       // 3. Update Language Toggle Button visual state
       const btnToggle = document.getElementById('btn_lang_toggle');
@@ -1021,7 +1142,10 @@ export class RobotArmApp {
           e.preventDefault();
           const leftPanel = document.getElementById('left-panel');
           if (leftPanel) {
-            leftPanel.classList.toggle('panel-collapsed');
+            const wasFocused = Boolean(this._focusViewState);
+            this._leaveFocusView(true);
+            if (wasFocused) leftPanel.classList.remove('panel-collapsed');
+            else leftPanel.classList.toggle('panel-collapsed');
             this._handleLayoutResize();
           }
         } else if (e.key === ']' || (e.altKey && e.key.toLowerCase() === 'right')) {
@@ -1036,7 +1160,10 @@ export class RobotArmApp {
           const bottomDock = document.getElementById('bottom-dock');
           const btnDockToggle = document.getElementById('btn-dock-toggle');
           if (bottomDock) {
-            const isCollapsed = bottomDock.classList.toggle('dock-collapsed');
+            const wasFocused = Boolean(this._focusViewState);
+            this._leaveFocusView(true);
+            const isCollapsed = wasFocused ? false : bottomDock.classList.toggle('dock-collapsed');
+            if (wasFocused) bottomDock.classList.remove('dock-collapsed');
             if (btnDockToggle) {
               btnDockToggle.textContent = isCollapsed ? i18n.t('dock.expand') : i18n.t('dock.collapse');
             }

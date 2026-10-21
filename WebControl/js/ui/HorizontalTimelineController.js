@@ -269,7 +269,11 @@ export class HorizontalTimelineController {
     if (chkLoop) {
       chkLoop.addEventListener('change', (e) => {
         if (this.trajectoryController) {
-          this.trajectoryController.loop = e.target.checked;
+          if (typeof this.trajectoryController.setLoop === 'function') {
+            this.trajectoryController.setLoop(e.target.checked);
+          } else {
+            this.trajectoryController.loop = e.target.checked;
+          }
         }
       });
     }
@@ -420,12 +424,33 @@ export class HorizontalTimelineController {
 
         const interp = {
           j1: (prevWp.j1 ?? 0) + alpha * ((wp.j1 ?? 0) - (prevWp.j1 ?? 0)),
-          j2: (prevWp.j2 ?? -90) + alpha * ((wp.j2 ?? -90) - (prevWp.j2 ?? -90)),
-          j3: (prevWp.j3 ?? 90) + alpha * ((wp.j3 ?? 90) - (prevWp.j3 ?? 90)),
-          j4: (prevWp.j4 ?? 90) + alpha * ((wp.j4 ?? 90) - (prevWp.j4 ?? 90)),
-          j5: (prevWp.j5 ?? 90) + alpha * ((wp.j5 ?? 90) - (prevWp.j5 ?? 90)),
+          j2: (prevWp.j2 ?? 0) + alpha * ((wp.j2 ?? 0) - (prevWp.j2 ?? 0)),
+          j3: (prevWp.j3 ?? 0) + alpha * ((wp.j3 ?? 0) - (prevWp.j3 ?? 0)),
+          j4: (prevWp.j4 ?? 0) + alpha * ((wp.j4 ?? 0) - (prevWp.j4 ?? 0)),
+          j5: (prevWp.j5 ?? 0) + alpha * ((wp.j5 ?? 0) - (prevWp.j5 ?? 0)),
+          j6: (prevWp.j6 ?? 0) + alpha * ((wp.j6 ?? 0) - (prevWp.j6 ?? 0)),
           grip: (prevWp.grip ?? 90) + alpha * ((wp.grip ?? 90) - (prevWp.grip ?? 90))
         };
+
+        for (const axis of ['x', 'y', 'z']) {
+          const start = Number(prevWp[axis]);
+          const end = Number(wp[axis]);
+          if (prevWp[axis] != null && wp[axis] != null && Number.isFinite(start) && Number.isFinite(end)) {
+            interp[axis] = start + alpha * (end - start);
+          }
+        }
+        for (const angle of ['roll', 'pitch', 'yaw']) {
+          const start = Number(prevWp[angle]);
+          const end = Number(wp[angle]);
+          if (prevWp[angle] != null && wp[angle] != null && Number.isFinite(start) && Number.isFinite(end)) {
+            const shortest = ((end - start + 540) % 360) - 180;
+            interp[angle] = start + alpha * shortest;
+          }
+        }
+        const modeSource = alpha < 0.5 ? prevWp : wp;
+        interp.orientationMode = modeSource.orientationMode;
+        interp.w = modeSource.w;
+        interp.frame = modeSource.frame;
 
         this._applyPoseToGhost(interp);
         break;

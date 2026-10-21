@@ -5,7 +5,7 @@
  * when connected to the local ESP32 Access Point (STPE_Robot).
  */
 
-const CACHE_NAME = 'stpe-robot-arm-v2';
+const CACHE_NAME = 'stpe-robot-arm-v5';
 
 const STATIC_ASSETS = [
   './',
@@ -88,7 +88,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Cache-first for local static resources, network fallback
+// Fetch: Network-First for local .js, .css, .html; Cache-First for heavy meshes (.stl) and vendor libraries
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   
@@ -97,26 +97,64 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  const url = new URL(request.url);
+  const pathname = url.pathname;
 
-      return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+  // Cache-First for heavy .stl mesh files and vendor libraries
+  const isCacheFirst = pathname.endsWith('.stl') || pathname.includes('/vendor/');
+
+  if (isCacheFirst) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
+
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        }).catch(() => {
+          // Offline fallback for navigation
+          if (request.mode === 'navigate') {
+            return caches.match('./index.html').then((fallback) => {
+              return fallback || new Response('', { status: 503, statusText: 'Offline' });
+            });
+          }
+          return new Response('', { status: 503, statusText: 'Offline' });
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-First for local .js, .css, .html, and other application files (with offline cache fallback)
+  event.respondWith(
+    fetch(request).then((networkResponse) => {
+      if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(request, responseToCache);
         });
-        return networkResponse;
-      }).catch(() => {
+      }
+      return networkResponse;
+    }).catch(() => {
+      // Offline fallback: check cache first
+      return caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
         // Offline fallback for navigation
         if (request.mode === 'navigate') {
-          return caches.match('./index.html');
+          return caches.match('./index.html').then((fallback) => {
+            return fallback || new Response('', { status: 503, statusText: 'Offline' });
+          });
         }
+        return new Response('', { status: 503, statusText: 'Offline' });
       });
     })
   );

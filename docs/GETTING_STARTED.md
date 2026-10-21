@@ -1,5 +1,7 @@
 # Getting started with STPPE Reborn
 
+**English** · [Polski](GETTING_STARTED.pl.md)
+
 [← Project overview](../README.md) · [System specification](STPPE_SYSTEM_SPECIFICATION.md) · [Roadmap](ROADMAP.md)
 
 Start with the virtual controller to explore Control Studio. It uses the same interface as a hardware connection and does not require a Teensy, motors, or a serial port.

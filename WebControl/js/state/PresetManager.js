@@ -583,19 +583,19 @@ export const DEFAULT_PRESETS = Object.freeze({
     description: 'Precision 5-point star CNC toolpath generated from standard G-code with rapid moves and tool plunging',
     isBuiltin: true,
     waypoints: [
-      { id: 'wp_cnc_1', label: 'Approach Star Top (G0)', j1: 6.10, j2: 41.13, j3: 41.39, j4: 97.48, j5: 0.0, dx: 0, dy: 0, dur: 350, grip: 0, comment: 'G0 X0 Y20 Z10 F3000' },
-      { id: 'wp_cnc_2', label: 'Plunge to Surface (G1)', j1: 6.10, j2: 45.08, j3: 40.47, j4: 94.45, j5: 0.0, dx: 0, dy: 0, dur: 500, grip: 180, comment: 'G1 Z0 F600 ; Tool on' },
-      { id: 'wp_cnc_3', label: 'Inner Corner 1', j1: 1.13, j2: 46.10, j3: 37.98, j4: 95.92, j5: 0.0, dx: 0, dy: 0, dur: 750, grip: 180, comment: 'G1 X5.88 Y6.18' },
-      { id: 'wp_cnc_4', label: 'Star Tip 2 (Right)', j1: 1.05, j2: 48.96, j3: 31.22, j4: 99.82, j5: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X19.02 Y6.18' },
-      { id: 'wp_cnc_5', label: 'Inner Corner 2', j1: -1.51, j2: 46.64, j3: 36.69, j4: 96.68, j5: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X8.41 Y-1.53' },
-      { id: 'wp_cnc_6', label: 'Star Tip 3 (Bottom-Right)', j1: -5.66, j2: 47.66, j3: 34.27, j4: 98.08, j5: 0.0, dx: 0, dy: 0, dur: 660, grip: 180, comment: 'G1 X12.36 Y-14.18' },
-      { id: 'wp_cnc_7', label: 'Inner Corner 3 (Bottom)', j1: -2.90, j2: 44.94, j3: 40.81, j4: 94.25, j5: 0.0, dx: 0, dy: 0, dur: 760, grip: 180, comment: 'G1 X0 Y-5.20' },
-      { id: 'wp_cnc_8', label: 'Star Tip 4 (Bottom-Left)', j1: -6.60, j2: 42.73, j3: 46.41, j4: 90.86, j5: 0.0, dx: 0, dy: 0, dur: 760, grip: 180, comment: 'G1 X-12.36 Y-14.18' },
-      { id: 'wp_cnc_9', label: 'Inner Corner 4', j1: -1.68, j2: 43.29, j3: 44.96, j4: 91.74, j5: 0.0, dx: 0, dy: 0, dur: 660, grip: 180, comment: 'G1 X-8.41 Y-1.53' },
-      { id: 'wp_cnc_10', label: 'Star Tip 5 (Left)', j1: 1.33, j2: 41.39, j3: 49.98, j4: 88.63, j5: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X-19.02 Y6.18' },
-      { id: 'wp_cnc_11', label: 'Inner Corner 5', j1: 1.22, j2: 43.76, j3: 43.76, j4: 92.48, j5: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X-5.88 Y6.18' },
-      { id: 'wp_cnc_12', label: 'Close Star Contour', j1: 6.10, j2: 45.08, j3: 40.47, j4: 94.45, j5: 0.0, dx: 0, dy: 0, dur: 750, grip: 180, comment: 'G1 X0 Y20' },
-      { id: 'wp_cnc_13', label: 'Retract Tool & Finish (G0)', j1: 6.10, j2: 39.19, j3: 41.74, j4: 99.08, j5: 0.0, dx: 0, dy: 0, dur: 300, grip: 0, comment: 'G0 Z15 ; Tool off' }
+      { id: 'wp_cnc_1', label: 'Approach Star Top (G0)', j1: 6.10, j2: 41.13, j3: 41.39, j4: 0.0, j5: -82.52, j6: 0.0, dx: 0, dy: 0, dur: 350, grip: 0, comment: 'G0 X0 Y20 Z10 F3000' },
+      { id: 'wp_cnc_2', label: 'Plunge to Surface (G1)', j1: 6.10, j2: 45.08, j3: 40.47, j4: 0.0, j5: -85.55, j6: 0.0, dx: 0, dy: 0, dur: 500, grip: 180, comment: 'G1 Z0 F600 ; Tool on' },
+      { id: 'wp_cnc_3', label: 'Inner Corner 1', j1: 1.13, j2: 46.10, j3: 37.98, j4: 0.0, j5: -84.08, j6: 0.0, dx: 0, dy: 0, dur: 750, grip: 180, comment: 'G1 X5.88 Y6.18' },
+      { id: 'wp_cnc_4', label: 'Star Tip 2 (Right)', j1: 1.05, j2: 48.96, j3: 31.22, j4: 0.0, j5: -80.18, j6: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X19.02 Y6.18' },
+      { id: 'wp_cnc_5', label: 'Inner Corner 2', j1: -1.51, j2: 46.64, j3: 36.69, j4: 0.0, j5: -83.33, j6: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X8.41 Y-1.53' },
+      { id: 'wp_cnc_6', label: 'Star Tip 3 (Bottom-Right)', j1: -5.66, j2: 47.66, j3: 34.27, j4: 0.0, j5: -81.93, j6: 0.0, dx: 0, dy: 0, dur: 660, grip: 180, comment: 'G1 X12.36 Y-14.18' },
+      { id: 'wp_cnc_7', label: 'Inner Corner 3 (Bottom)', j1: -2.90, j2: 44.94, j3: 40.81, j4: 0.0, j5: -85.75, j6: 0.0, dx: 0, dy: 0, dur: 760, grip: 180, comment: 'G1 X0 Y-5.20' },
+      { id: 'wp_cnc_8', label: 'Star Tip 4 (Bottom-Left)', j1: -6.60, j2: 42.73, j3: 46.41, j4: 0.0, j5: -89.14, j6: 0.0, dx: 0, dy: 0, dur: 760, grip: 180, comment: 'G1 X-12.36 Y-14.18' },
+      { id: 'wp_cnc_9', label: 'Inner Corner 4', j1: -1.68, j2: 43.29, j3: 44.96, j4: 0.0, j5: -88.25, j6: 0.0, dx: 0, dy: 0, dur: 660, grip: 180, comment: 'G1 X-8.41 Y-1.53' },
+      { id: 'wp_cnc_10', label: 'Star Tip 5 (Left)', j1: 1.33, j2: 41.39, j3: 49.98, j4: 0.0, j5: -90.00, j6: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X-19.02 Y6.18' },
+      { id: 'wp_cnc_11', label: 'Inner Corner 5', j1: 1.22, j2: 43.76, j3: 43.76, j4: 0.0, j5: -87.52, j6: 0.0, dx: 0, dy: 0, dur: 650, grip: 180, comment: 'G1 X-5.88 Y6.18' },
+      { id: 'wp_cnc_12', label: 'Close Star Contour', j1: 6.10, j2: 45.08, j3: 40.47, j4: 0.0, j5: -85.55, j6: 0.0, dx: 0, dy: 0, dur: 750, grip: 180, comment: 'G1 X0 Y20' },
+      { id: 'wp_cnc_13', label: 'Retract Tool & Finish (G0)', j1: 6.10, j2: 39.19, j3: 41.74, j4: 0.0, j5: -80.93, j6: 0.0, dx: 0, dy: 0, dur: 300, grip: 0, comment: 'G0 Z15 ; Tool off' }
     ]
   }
 });
@@ -994,10 +994,12 @@ export class PresetManager {
         j3: wp.j3,
         j4: wp.j4,
         j5: wp.j5,
+        j6: wp.j6 ?? 0,
         dx: wp.dx,
         dy: wp.dy,
         dur: wp.dur,
         grip: wp.grip,
+        moveType: wp.moveType || 'joint',
         comment: wp.comment
       }))
     };

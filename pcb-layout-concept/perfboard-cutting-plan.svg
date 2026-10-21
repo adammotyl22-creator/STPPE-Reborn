@@ -1,0 +1,238 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1650" viewBox="0 0 1900 1650">
+<rect width="1900" height="1650" fill="#f5f7fb"/>
+<text x="65" y="65" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="39" font-weight="700" text-anchor="start">Plan podziału płytek 120 × 80 mm</text>
+<text x="65" y="106" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="25" font-weight="400" text-anchor="start">Dwie płytki • bok 120 mm pionowo • wymiary orientacyjne</text>
+<text x="65" y="145" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="23" font-weight="400" text-anchor="start">To nie jest szablon do bezpośredniego cięcia: najpierw karton, pomiar i przymiarka do otworów.</text>
+<text x="65" y="197" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" text-anchor="start">ZŁOŻENIE • moduły bez zmiany położenia</text>
+<polygon points="300,230 1031.5,230 1031.5,1077 181,1077 173.1736111111111,1076.6597222222222 166.02777777777777,1075.6388888888891 159.5625,1073.9375 153.77777777777777,1071.5555555555557 148.67361111111111,1068.4930555555557 144.25,1064.75 140.50694444444443,1060.326388888889 137.44444444444446,1055.2222222222222 135.0625,1049.4375 133.3611111111111,1042.9722222222222 132.34027777777777,1035.826388888889 132.0,1028.0 132,728.4000000000001 216,728.4000000000001 300,644.4000000000001" fill="#edf0f5" stroke="#a8b5c1" stroke-width="1"/>
+<polygon points="313.3,233.5 580,233.5 580,1073.5 184.5,1073.5 180.22936860536475,1073.3135402064954 175.99123929432042,1072.7555798975982 171.81786678997648,1071.8303654881643 167.74101297704223,1070.5449384185094 163.79170517470573,1068.909081564796 160.0,1066.9352447854376 156.39475461879874,1064.6384501701605 153.0034071253596,1062.03617771283 149.85176772185918,1059.1482322781408 146.9638222871701,1055.9965928746406 144.36154982983942,1052.6052453812013 142.06475521456252,1049.0 140.09091843520417,1045.2082948252942 138.4550615814905,1041.2589870229579 137.16963451183568,1037.1821332100235 136.24442010240182,1033.0087607056796 135.68645979350447,1028.7706313946353 135.5,1024.5 135.5,731.34 313.3,731.34" fill="#e1f0e7" stroke="#428167" stroke-width="2"/>
+<rect x="594" y="233.5" width="426.72" height="840" fill="#e1f0e7" stroke="#428167" stroke-width="2"/>
+<rect x="580" y="233.5" width="14" height="840" fill="#f3dfaa" stroke="#bc9a43" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="580" y1="233.5" x2="594" y2="233.5" stroke="#bc9a43" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="594" y1="233.5" x2="594" y2="1073.5" stroke="#bc9a43" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="594" y1="1073.5" x2="580" y2="1073.5" stroke="#bc9a43" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="580" y1="1073.5" x2="580" y2="233.5" stroke="#bc9a43" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="1055" y="657" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="400" text-anchor="start">120</text>
+<line x1="1035" y1="233.5" x2="1035" y2="1073.5" stroke="#586b7f" stroke-width="2"/>
+<rect x="349" y="279" width="217" height="128.1" fill="#d0eae5" stroke="#247c75" stroke-width="2"/>
+<text x="457.5" y="331.5" fill="#247c75" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" text-anchor="middle">KAmod</text>
+<text x="457.5" y="370" fill="#247c75" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" text-anchor="middle">I2C Hub8</text>
+<rect x="349" y="496" width="147" height="124.60000000000001" fill="#d0eae5" stroke="#247c75" stroke-width="2"/>
+<text x="422.5" y="538" fill="#247c75" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="700" text-anchor="middle">XIAO</text>
+<text x="422.5" y="580" fill="#247c75" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" text-anchor="middle">ESP32C3</text>
+<rect x="139" y="762" width="426.72" height="124.46000000000001" fill="#dce8ff" stroke="#2468b4" stroke-width="2"/>
+<text x="352.36" y="804" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="23" font-weight="700" text-anchor="middle">Teensy 4.1</text>
+<text x="352.36" y="853" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="19" font-weight="400" text-anchor="middle">USB w lewo</text>
+<rect x="118" y="797" width="21" height="49" fill="#c5cdd8" stroke="#586b7f" stroke-width="2"/>
+<line x1="111" y1="821.5" x2="69" y2="821.5" stroke="#b93f51" stroke-width="3"/>
+<line x1="69" y1="821.5" x2="79.57898635053944" y2="815.8356335045214" stroke="#b93f51" stroke-width="3"/>
+<line x1="69" y1="821.5" x2="79.57898635053942" y2="827.1643664954786" stroke="#b93f51" stroke-width="3"/>
+<text x="65" y="783" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" text-anchor="start">USB ←</text>
+<text x="65" y="902" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">0,5 mm od krawędzi:</text>
+<text x="65" y="930" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">sprawdź wtyk / przewód</text>
+<rect x="699" y="279" width="301" height="147" fill="#fff0d5" stroke="#a87722" stroke-width="2"/>
+<text x="849.5" y="335" fill="#a87722" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="middle">LM2596</text>
+<text x="849.5" y="384" fill="#a87722" font-family="Segoe UI,Arial,sans-serif" font-size="23" font-weight="700" text-anchor="middle">24 V → 5 V</text>
+<rect x="608" y="594" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="661.3399999999999" y="629" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M1</text>
+<rect x="629.8399999999999" y="643" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="640.3399999999999" y1="645.0999999999999" x2="640.3399999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="650.8399999999999" y1="645.0999999999999" x2="650.8399999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="661.3399999999999" y1="645.0999999999999" x2="661.3399999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="671.8399999999999" y1="645.0999999999999" x2="671.8399999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="682.3399999999999" y1="645.0999999999999" x2="682.3399999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<text x="661.3399999999999" y="727" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="750.24" y="594" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="803.5799999999999" y="629" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M2</text>
+<rect x="772.0799999999999" y="643" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="782.5799999999999" y1="645.0999999999999" x2="782.5799999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="793.0799999999999" y1="645.0999999999999" x2="793.0799999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="803.5799999999999" y1="645.0999999999999" x2="803.5799999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="814.0799999999999" y1="645.0999999999999" x2="814.0799999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="824.5799999999999" y1="645.0999999999999" x2="824.5799999999999" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<text x="803.5799999999999" y="727" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="892.48" y="594" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="945.82" y="629" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M3</text>
+<rect x="914.32" y="643" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="924.82" y1="645.0999999999999" x2="924.82" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="935.32" y1="645.0999999999999" x2="935.32" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="945.82" y1="645.0999999999999" x2="945.82" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="956.32" y1="645.0999999999999" x2="956.32" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<line x1="966.82" y1="645.0999999999999" x2="966.82" y2="703.9000000000001" stroke="#7c8993" stroke-width="1"/>
+<text x="945.82" y="727" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="608" y="818" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="661.3399999999999" y="853" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M4</text>
+<rect x="629.8399999999999" y="867" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="640.3399999999999" y1="869.1" x2="640.3399999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="650.8399999999999" y1="869.1" x2="650.8399999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="661.3399999999999" y1="869.1" x2="661.3399999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="671.8399999999999" y1="869.1" x2="671.8399999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="682.3399999999999" y1="869.1" x2="682.3399999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<text x="661.3399999999999" y="951" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="750.24" y="818" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="803.5799999999999" y="853" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M5</text>
+<rect x="772.0799999999999" y="867" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="782.5799999999999" y1="869.1" x2="782.5799999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="793.0799999999999" y1="869.1" x2="793.0799999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="803.5799999999999" y1="869.1" x2="803.5799999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="814.0799999999999" y1="869.1" x2="814.0799999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="824.5799999999999" y1="869.1" x2="824.5799999999999" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<text x="803.5799999999999" y="951" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="892.48" y="818" width="106.68" height="142.24" fill="#fae2cc" stroke="#a6642d" stroke-width="2"/>
+<text x="945.82" y="853" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">M6</text>
+<rect x="914.32" y="867" width="63" height="63" fill="#c3ccd2" stroke="#77828c" stroke-width="2"/>
+<line x1="924.82" y1="869.1" x2="924.82" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="935.32" y1="869.1" x2="935.32" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="945.82" y1="869.1" x2="945.82" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="956.32" y1="869.1" x2="956.32" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<line x1="966.82" y1="869.1" x2="966.82" y2="927.9" stroke="#7c8993" stroke-width="1"/>
+<text x="945.82" y="951" fill="#8e4918" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="400" text-anchor="middle">TMC2209</text>
+<rect x="181" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="181" y1="993" x2="286" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="286" y1="993" x2="286" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="286" y1="1063" x2="181" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="181" y1="1063" x2="181" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="233.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M1</text>
+<circle cx="202" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="223" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="244" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="265" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="233.5" y1="1070" x2="233.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="233.5" y1="1140" x2="227.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="233.5" y1="1140" x2="239.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<rect x="300" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="300" y1="993" x2="405" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="405" y1="993" x2="405" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="405" y1="1063" x2="300" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="300" y1="1063" x2="300" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="352.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M2</text>
+<circle cx="321" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="342" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="363" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="384" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="352.5" y1="1070" x2="352.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="352.5" y1="1140" x2="346.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="352.5" y1="1140" x2="358.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<rect x="419" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="419" y1="993" x2="524" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="524" y1="993" x2="524" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="524" y1="1063" x2="419" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="419" y1="1063" x2="419" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="471.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M3</text>
+<circle cx="440" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="461" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="482" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="503" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="471.5" y1="1070" x2="471.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="471.5" y1="1140" x2="465.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="471.5" y1="1140" x2="477.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<rect x="615" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="615" y1="993" x2="720" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="720" y1="993" x2="720" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="720" y1="1063" x2="615" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="615" y1="1063" x2="615" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="667.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M4</text>
+<circle cx="636" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="657" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="678" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="699" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="667.5" y1="1070" x2="667.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="667.5" y1="1140" x2="661.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="667.5" y1="1140" x2="673.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<rect x="748" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="748" y1="993" x2="853" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="853" y1="993" x2="853" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="853" y1="1063" x2="748" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="748" y1="1063" x2="748" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="800.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M5</text>
+<circle cx="769" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="790" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="811" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="832" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="800.5" y1="1070" x2="800.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="800.5" y1="1140" x2="794.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="800.5" y1="1140" x2="806.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<rect x="881" y="993" width="105" height="70" fill="#dcecff" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="881" y1="993" x2="986" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="986" y1="993" x2="986" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="986" y1="1063" x2="881" y2="1063" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<line x1="881" y1="1063" x2="881" y2="993" stroke="#2468b4" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="933.5" y="1021" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" text-anchor="middle">M6</text>
+<circle cx="902" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="923" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="944" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<circle cx="965" cy="1045.5" r="2.5" fill="#ffffff" stroke="#2468b4"/>
+<line x1="933.5" y1="1070" x2="933.5" y2="1140" stroke="#2468b4" stroke-width="3"/>
+<line x1="933.5" y1="1140" x2="927.8356335045214" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<line x1="933.5" y1="1140" x2="939.1643664954786" y2="1129.4210136494605" stroke="#2468b4" stroke-width="3"/>
+<text x="356" y="965" fill="#428167" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" text-anchor="middle">A • logika + 3 wyjścia</text>
+<text x="630" y="1170" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="middle">Wyjścia silników w dół • złącza przełożone względem pierwszej koncepcji</text>
+<text x="630" y="1203" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="middle">Szczelina 2 mm; brak tras, otworów montażowych i połączeń mechanicznych na rysunku.</text>
+<text x="629" y="475" fill="#a27b27" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">Szczelina 2 mm</text>
+<line x1="622" y1="482" x2="587" y2="482" stroke="#a27b27" stroke-width="3"/>
+<line x1="587" y1="482" x2="597.5789863505395" y2="476.3356335045214" stroke="#a27b27" stroke-width="3"/>
+<line x1="587" y1="482" x2="597.5789863505395" y2="487.6643664954786" stroke="#a27b27" stroke-width="3"/>
+<text x="1185" y="205" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" text-anchor="start">DWA SUROWE FORMATY 80 × 120</text>
+<text x="1185" y="239" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="400" text-anchor="start">Zachować zielone • usunąć różowe</text>
+<rect x="1200" y="310" width="212.0" height="318.0" fill="#f8dfe1" stroke="#b93f51" stroke-width="2"/>
+<polygon points="1267.31,310.0 1368.275,310.0 1368.275,628.0 1218.55,628.0 1216.7317820468866,627.9106766797693 1214.931074526601,627.6435669514799 1213.1652192369297,627.2012432278325 1211.4512223296276,626.5879653280844 1209.8055905318777,625.8096394536619 1208.2441721774865,624.8737613082121 1206.7820045787644,623.7893439098788 1205.4331692089895,622.5668307910105 1204.2106560901211,621.2179954212356 1203.1262386917879,619.7558278225135 1202.190360546338,618.1944094681223 1201.4120346719155,616.5487776703724 1200.7987567721675,614.8347807630703 1200.35643304852,613.0689254733992 1200.0893233202307,611.2682179531133 1200.0,609.45 1200.0,498.468 1267.31,498.468" fill="#e1f0e7" stroke="#428167" stroke-width="2"/>
+<text x="1233.655" y="389.5" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="middle">odpad</text>
+<text x="1233.655" y="416.0" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="middle">wcięcia</text>
+<text x="1290.1" y="551.15" fill="#428167" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">A</text>
+<text x="1194" y="662.0" fill="#428167" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">~63,5 × 120</text>
+<text x="1194" y="693.0" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">Wcięcie: 25,4 × 71,12</text>
+<text x="1194" y="720.0" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">Narożnik: R7</text>
+<text x="1390.1375" y="540.55" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" text-anchor="middle">odpad</text>
+<text x="1390.1375" y="567.05" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" text-anchor="middle">16,5</text>
+<line x1="1200" y1="293" x2="1412.0" y2="293" stroke="#586b7f" stroke-width="2"/>
+<line x1="1200" y1="287" x2="1200" y2="299" stroke="#586b7f" stroke-width="2"/>
+<line x1="1412.0" y1="287" x2="1412.0" y2="299" stroke="#586b7f" stroke-width="2"/>
+<text x="1306.0" y="283" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="middle">80</text>
+<line x1="1440.0" y1="310" x2="1440.0" y2="628.0" stroke="#586b7f" stroke-width="2"/>
+<line x1="1434.0" y1="310" x2="1446.0" y2="310" stroke="#586b7f" stroke-width="2"/>
+<line x1="1434.0" y1="628.0" x2="1446.0" y2="628.0" stroke="#586b7f" stroke-width="2"/>
+<text x="1470.0" y="474.29999999999995" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="middle">120</text>
+<rect x="1550" y="310" width="212.0" height="318.0" fill="#f8dfe1" stroke="#b93f51" stroke-width="2"/>
+<rect x="1550" y="310" width="161.54399999999998" height="318.0" fill="#e1f0e7" stroke="#428167" stroke-width="2"/>
+<text x="1630.772" y="479.6" fill="#428167" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700" text-anchor="middle">B</text>
+<text x="1544" y="662.0" fill="#428167" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">~61 × 120</text>
+<text x="1544" y="693.0" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="18" font-weight="400" text-anchor="start">Nominalnie: 60,96 × 120</text>
+<text x="1736.772" y="540.55" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" text-anchor="middle">odpad</text>
+<text x="1736.772" y="567.05" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" text-anchor="middle">19,04</text>
+<line x1="1550" y1="293" x2="1762.0" y2="293" stroke="#586b7f" stroke-width="2"/>
+<line x1="1550" y1="287" x2="1550" y2="299" stroke="#586b7f" stroke-width="2"/>
+<line x1="1762.0" y1="287" x2="1762.0" y2="299" stroke="#586b7f" stroke-width="2"/>
+<text x="1656.0" y="283" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="middle">80</text>
+<line x1="1790.0" y1="310" x2="1790.0" y2="628.0" stroke="#586b7f" stroke-width="2"/>
+<line x1="1784.0" y1="310" x2="1796.0" y2="310" stroke="#586b7f" stroke-width="2"/>
+<line x1="1784.0" y1="628.0" x2="1796.0" y2="628.0" stroke="#586b7f" stroke-width="2"/>
+<text x="1820.0" y="474.29999999999995" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="middle">120</text>
+<text x="1200" y="270" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="start">PŁYTKA A • lewa, L</text>
+<text x="1550" y="270" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="700" text-anchor="start">PŁYTKA B • prawa</text>
+<text x="1185" y="782" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">Raster: odniesienie nominalne</text>
+<text x="1185" y="813" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">25,4 = 10 × 2,54; 71,12 = 28 × 2,54.</text>
+<text x="1185" y="841" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Początek otworów i rzeczywisty format nieznane.</text>
+<text x="1185" y="869" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Moduły dopasować do rzeczywistych otworów.</text>
+<text x="1185" y="897" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Wymiary nie obejmują rzazu.</text>
+<text x="1185" y="960" fill="#2468b4" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">B: moc + 3 wyjścia; A: logika + 3 wyjścia</text>
+<text x="1185" y="991" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Do trzech lewych wyjść: 12 przewodów fazowych.</text>
+<text x="1185" y="1019" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Prowadzenie nad / pod płytkami, w izolacji.</text>
+<text x="1185" y="1047" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Sprawdź wiązkę na sucho; kanał niezweryfikowany.</text>
+<text x="65" y="1290" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">1  Najpierw przymiarka</text>
+<text x="65" y="1321" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Wytnij model kartonowy; sprawdź obrys obudowy,</text>
+<text x="65" y="1349" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">złącza, kabel USB, raster i sposób podparcia.</text>
+<text x="65" y="1377" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Sprawdź: pojedyncze pady czy połączone paski.</text>
+<text x="690" y="1290" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">2  Cięcie od strony odpadu</text>
+<text x="690" y="1321" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Zacznij od długiego pasa, potem wytnij wcięcie L.</text>
+<text x="690" y="1349" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Nie wyłamuj narożnika L. Piłka o drobnych zębach,</text>
+<text x="690" y="1377" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">zamocowana płytka, następnie dopasowanie pilnikiem.</text>
+<text x="1320" y="1290" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" text-anchor="start">3  Montaż i zasilanie</text>
+<text x="1320" y="1321" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Każda część na własnych dystansach.</text>
+<text x="1320" y="1349" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Przewody / lut nie łączą mechanicznie płytek.</text>
+<text x="1320" y="1377" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Moc: osobne przewody, nie łańcuchy cienkich padów.</text>
+<line x1="65" y1="1440" x2="1835" y2="1440" stroke="#cad5df" stroke-width="2"/>
+<text x="65" y="1480" fill="#20354a" font-family="Segoe UI,Arial,sans-serif" font-size="23" font-weight="700" text-anchor="start">MINIMUM: 2 PŁYTKI</text>
+<text x="65" y="1514" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="21" font-weight="400" text-anchor="start">Jedna płytka 120 × 80 nie pokryje pola 104,5 × 121 mm z występem. Geometria jest orientacyjna.</text>
+<text x="65" y="1550" fill="#b93f51" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Jeśli laminat FR4: pył wymaga ochrony oczu, maski i wentylacji. Nacinanie / łamanie tylko jako wariant cięcia prostego.</text>
+<text x="65" y="1590" fill="#586b7f" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="400" text-anchor="start">Bryły modułów w skali 7 px/mm • mapy surowych płytek 2,65 px/mm • bez gwarancji elektrycznej i termicznej</text>
+</svg>

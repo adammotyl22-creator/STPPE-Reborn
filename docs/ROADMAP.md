@@ -1,5 +1,7 @@
 # STPPE Reborn roadmap
 
+**English** · [Polski](ROADMAP.pl.md)
+
 [← Project overview](../README.md) · [Setup guide](GETTING_STARTED.md) · [System specification](STPPE_SYSTEM_SPECIFICATION.md)
 
 This roadmap separates what can be explored today from the evidence and engineering work needed for a reproducible physical system. The milestones are an intended sequence, not release dates or claims of completed hardware validation.

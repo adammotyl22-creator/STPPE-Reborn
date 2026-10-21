@@ -21,7 +21,12 @@ import { MockSerialPort } from '../js/comms/MockSerialPort.js';
 import { WebSerialManager, ConnectionState } from '../js/comms/WebSerialManager.js';
 import {
   forwardKinematics,
+  forwardKinematics6DOF,
   solveIK,
+  solveIK6DOF,
+  eulerToQuat,
+  quatSlerp,
+  quatToEuler,
   degToSteps,
   stepsToDeg,
   clamp,
@@ -123,6 +128,10 @@ describe('TelemetryParser', () => {
 
   const warnRes = parseSerialLine('WARN:FLOOR_CLEARANCE\n');
   assert(warnRes !== null && warnRes.type === 'WARN', 'Parses warning responses');
+
+  const tcpRes = parseSerialLine('TCPCAL: TCP X=12.500 Y=-4.200 Z=8.700 mm, RMS=0.003 mm (EEPROM save scheduled)\n');
+  assert(tcpRes?.type === 'TCPCAL_RESULT' && tcpRes.x === 12.5 && tcpRes.y === -4.2 && tcpRes.z === 8.7 && tcpRes.rmsErrorMm === 0.003,
+    'Parses TCP calibration vector and RMS error');
 });
 
 // -----------------------------------------------------------------------------
@@ -163,6 +172,44 @@ describe('RobotKinematics (FK, IK, and Unit Math)', () => {
   assert(clamp(150, 0, 100) === 100, 'clamp respects upper bound');
   assert(clamp(-50, 0, 100) === 0, 'clamp respects lower bound');
   assert(clamp(50, 0, 100) === 50, 'clamp passes within-bound values');
+});
+
+describe('6DOF firmware kinematics parity', () => {
+  const near = (a, b, tolerance = 1e-6) => Math.abs(a - b) < tolerance;
+  const pose = { j1: 12, j2: -8, j3: 32, j4: 25, j5: -30, j6: 40 };
+  const offset = { workOffset: { x: 11, y: -7, z: 5 }, toolOffset: { x: 8, y: -3, z: 6 } };
+  const fk = forwardKinematics6DOF(pose.j1, pose.j2, pose.j3, pose.j4, pose.j5, pose.j6, offset);
+  const raw = forwardKinematics6DOF(pose.j1, pose.j2, pose.j3, pose.j4, pose.j5, pose.j6, { ...offset, raw: true });
+  assert(near(fk.x - raw.x, fk.R06[0][0] * 8 - fk.R06[0][1] * 3 + fk.R06[0][2] * 6 + 11) &&
+    near(fk.y - raw.y, fk.R06[1][0] * 8 - fk.R06[1][1] * 3 + fk.R06[1][2] * 6 - 7) &&
+    near(fk.z - raw.z, fk.R06[2][0] * 8 - fk.R06[2][1] * 3 + fk.R06[2][2] * 6 + 5),
+  '6DOF FK applies tool offset in flange frame and work offset in world frame');
+  const ik = solveIK6DOF(fk.x, fk.y, fk.z, fk.roll, fk.pitch, fk.yaw,
+    { ...offset, currentAngles: pose });
+  assert(ik.success && Object.keys(pose).every(j => near(ik.angles[j], pose[j], 1e-4)),
+    '6DOF IK round-trips a negative-J5 pose with local tool and work offsets');
+
+  const positive = { ...pose, j5: 30 };
+  const positiveFk = forwardKinematics6DOF(...Object.values(positive));
+  const positiveIk = solveIK6DOF(positiveFk.x, positiveFk.y, positiveFk.z,
+    positiveFk.roll, positiveFk.pitch, positiveFk.yaw, { currentAngles: positive });
+  assert(positiveIk.success && Object.keys(positive).every(j => near(positiveIk.angles[j], positive[j], 1e-4)),
+    '6DOF IK round-trips the positive-J5 wrist branch');
+
+  const singular = { ...pose, j5: 0, j4: 35, j6: 20 };
+  const singularFk = forwardKinematics6DOF(...Object.values(singular));
+  const singularIk = solveIK6DOF(singularFk.x, singularFk.y, singularFk.z,
+    singularFk.roll, singularFk.pitch, singularFk.yaw, { currentAngles: singular });
+  assert(singularIk.wristSingular && near(singularIk.j4, singular.j4, 1e-4) &&
+    near(singularIk.j6, singular.j6, 1e-4),
+    '6DOF IK preserves current J4 and combined roll at exact wrist singularity');
+
+  const q0 = eulerToQuat(0, 0, 170);
+  const q1 = eulerToQuat(0, 0, -170);
+  const midpoint = quatSlerp(q0, q1, 0.5);
+  const euler = quatToEuler(midpoint);
+  assert(near(Math.hypot(midpoint.w, midpoint.x, midpoint.y, midpoint.z), 1) && near(Math.abs(euler.yaw), 180),
+    '6DOF SLERP follows shortest yaw path across the 180-degree seam');
 });
 
 // -----------------------------------------------------------------------------
@@ -231,8 +278,10 @@ describe('PresetManager Sequences & Presets', () => {
 describe('MockSerialPort Virtual Hardware', () => {
   const mock = new MockSerialPort();
   let receivedTelemetry = false;
+  const responses = [];
 
   mock.onOutput((dataStr) => {
+    responses.push(dataStr);
     if (dataStr.includes('{') || dataStr.includes('JTELEM')) {
       receivedTelemetry = true;
     }
@@ -243,6 +292,36 @@ describe('MockSerialPort Virtual Hardware', () => {
 
   mock.receiveFromClient('<0,-90,90,90,90,0,0,100,50>\n');
   assert(mock.isOpen === true, 'Mock serial port accepts packets without crashing');
+
+  mock._processCommandLine('MODE T1');
+  assert(mock.opMode === 'T1', 'Mock accepts T1 operation mode');
+  mock._processCommandLine('TOOLX 12.5');
+  mock._processCommandLine('TOOLY -4.2');
+  mock._processCommandLine('TOOLZ 8.7');
+  for (let pose = 1; pose <= 4; pose++) mock._processCommandLine(`TCPCAL ${pose}`);
+  mock._processCommandLine('TCPCAL SOLVE');
+  assert(responses.some((chunk) => chunk.split(/\r?\n/).some((line) => parseSerialLine(line)?.type === 'TCPCAL_RESULT')),
+    'Mock emits parseable TCP calibration result after four captures');
+  mock._processCommandLine('TCPCAL CLEAR');
+  assert(mock.tcpCalPoses.size === 0, 'Mock clears TCP calibration captures');
+
+  mock.setPose({ j1: 10, j2: 10, j3: 50, j4: 20, j5: 30, j6: 30 });
+  const linearTarget = forwardKinematics6DOF(10, 10, 50, 25, 35, 40, {
+    toolOffset: mock.toolOffset, workOffset: mock.workOffset
+  });
+  mock._processCommandLine(`MOVL X${linearTarget.x.toFixed(1)} Y${linearTarget.y.toFixed(1)} Z${linearTarget.z.toFixed(1)} R${linearTarget.roll.toFixed(1)} P${linearTarget.pitch.toFixed(1)} YW${linearTarget.yaw.toFixed(1)} D2000`);
+  assert(mock.linearPath !== null, 'Mock accepts oriented 6DOF MOVL with SLERP path');
+  if (mock.linearPath) {
+    const start = mock.linearPath.start;
+    const end = mock.linearPath.end;
+    mock.moveStartTime = Date.now() - 1000;
+    mock._stepPhysics();
+    const midway = forwardKinematics6DOF(mock.j1, mock.j2, mock.j3, mock.j4, mock.j5, mock.j6, {
+      toolOffset: mock.toolOffset, workOffset: mock.workOffset
+    });
+    assert(Math.hypot(midway.x - (start.x + end.x) / 2, midway.y - (start.y + end.y) / 2,
+      midway.z - (start.z + end.z) / 2) < 1.0, 'Mock oriented MOVL follows the Cartesian midpoint');
+  }
 
   mock.close();
   assert(mock.isOpen === false, 'Mock serial port closes cleanly');
@@ -264,6 +343,20 @@ describe('DOM & Data Attribute Stability Contract (index.html)', () => {
     'display_telemetry_rate',
     'btn_estop',
     'btn_reenable',
+    'btn_mode_toggle',
+    'btn_controlled_stop',
+    'btn_tcp_cal_pose_1',
+    'btn_tcp_cal_pose_2',
+    'btn_tcp_cal_pose_3',
+    'btn_tcp_cal_pose_4',
+    'btn_tcp_cal_solve',
+    'btn_tcp_cal_clear',
+    'input_tool_x',
+    'input_tool_y',
+    'input_tool_z',
+    'input_work_x',
+    'input_work_y',
+    'input_work_z',
     'badge_homing_status',
     'slider_speed_override',
     'label_speed_val',
@@ -372,6 +465,14 @@ describe('DOM & Data Attribute Stability Contract (index.html)', () => {
   assert(htmlContent.includes('data-mode-tab="joints"'), 'Mode tab for Joints (FK) is present');
   assert(htmlContent.includes('data-mode-tab="ik"'), 'Mode tab for Target (IK) is present');
   assert(htmlContent.includes('data-mode-tab="trajectory"'), 'Mode tab for Sequencer is present');
+
+  // Verify Split-Button Homing DOM integrity
+  assert(htmlContent.includes('class="home-split-group"'), 'home-split-group exists in index.html');
+  assert(htmlContent.includes('class="btn-home btn-home-primary"'), 'btn-home-primary button exists');
+  assert(htmlContent.includes('id="btn_home_menu_trigger"'), 'btn_home_menu_trigger exists');
+  assert(htmlContent.includes('<svg class="ico-home"'), 'ico-home SVG icon is present');
+  assert(htmlContent.includes('<span data-i18n="header.home.all">'), 'data-i18n is on the leaf span to protect SVG');
+  assert(!/<button[^>]*class="[^"]*btn-home-primary[^"]*"[^>]*data-i18n=/i.test(htmlContent), 'btn-home-primary does not have data-i18n on parent button');
 });
 
 // -----------------------------------------------------------------------------
@@ -402,6 +503,7 @@ describe('CSS Theme & Anti-Neon Audit', () => {
   assert(themeCss.includes('--bg-panel: #181a20;'), 'Neutral panel surface defined');
   assert(themeCss.includes('--bg-card: #20232a;'), 'Card surface defined');
   assert(themeCss.includes('--text-primary: #f8fafc;'), 'High contrast primary text defined');
+  assert(mainCss.includes(':not(.btn-home-primary):not(.btn-home-chevron)'), 'main.css exempts split button from global radius override');
 });
 
 // -----------------------------------------------------------------------------
@@ -730,6 +832,8 @@ describe('Suite 15: Master Motion & Cartesian IK Controller', () => {
     serialManager: serialMgr,
     autoSend: false
   });
+  assert(mc.POSE_PRESETS.stow.joints.j2 === -60 && mc.POSE_PRESETS.stow.joints.j2 >= JOINT_LIMITS.j2.min,
+    'Stow preset respects the J2 lower limit');
 
   // 1. Joint target clamping and FK
   mc.setJointTarget('j1', 45.0, false, false);
@@ -781,6 +885,60 @@ describe('Suite 15: Master Motion & Cartesian IK Controller', () => {
   assert(mc.LIVE_STREAM_INTERVAL_MS === 50, "Throttling interval configured to 50ms");
   assert(mc.LIVE_STREAM_DURATION_MS === 0, "Live stream duration configured to 0ms");
   mc.flushFinalTarget();
+
+  // 8. Orientation Mode Visibility Toggling (6-DOF vs Preset Wrist)
+  const createMockClassList = () => {
+    const classes = new Set();
+    return {
+      classes,
+      toggle: (cls, force) => {
+        if (force === undefined) {
+          if (classes.has(cls)) classes.delete(cls); else classes.add(cls);
+        } else if (force) {
+          classes.add(cls);
+        } else {
+          classes.delete(cls);
+        }
+      },
+      has: (cls) => classes.has(cls)
+    };
+  };
+
+  const mockOrient6dof = { classList: createMockClassList() };
+  const mockWristWrapper = { classList: createMockClassList() };
+  const mockWristContainer = { classList: createMockClassList() };
+  const mockBtn6dof = { classList: createMockClassList() };
+  const mockBtnWrist = { classList: createMockClassList() };
+
+  global.document = { activeElement: null, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
+  mc._domBound = true;
+  mc._domElements = {
+    ...mc._domElements,
+    containerOrient6dof: mockOrient6dof,
+    wrapperWristMode: mockWristWrapper,
+    containerWristMode: mockWristContainer,
+    btnOrient6dof: mockBtn6dof,
+    btnOrientWrist: mockBtnWrist
+  };
+
+  // Test 6-DOF Mode: Sliders visible, Preset wrist mode hidden
+  mc.setOrientationMode("6dof");
+  assert(mc.cartesian.orientationMode === "6dof", "setOrientationMode 6dof sets mode correctly");
+  assert(!mockOrient6dof.classList.has("hidden"), "6-DOF mode shows orientation sliders");
+  assert(mockWristWrapper.classList.has("hidden"), "6-DOF mode hides preset wrist mode");
+  assert(mockWristContainer.classList.has("wrist-mode-hidden"), "6-DOF mode marks wrist container as wrist-mode-hidden");
+  assert(mockBtn6dof.classList.has("active"), "6-DOF mode activates 6dof button");
+  assert(!mockBtnWrist.classList.has("active"), "6-DOF mode deactivates preset button");
+
+  // Test Preset Mode: Sliders hidden, Preset wrist mode visible
+  mc.setOrientationMode("preset");
+  assert(mc.cartesian.orientationMode === "preset", "setOrientationMode preset sets mode correctly");
+  assert(mockOrient6dof.classList.has("hidden"), "Preset mode hides orientation sliders");
+  assert(!mockWristWrapper.classList.has("hidden"), "Preset mode shows preset wrist mode");
+  assert(!mockWristContainer.classList.has("wrist-mode-hidden"), "Preset mode unsets wrist-mode-hidden on wrist container");
+  assert(!mockBtn6dof.classList.has("active"), "Preset mode deactivates 6dof button");
+  assert(mockBtnWrist.classList.has("active"), "Preset mode activates preset button");
+  delete global.document;
 });
 
 // -----------------------------------------------------------------------------
@@ -1546,7 +1704,7 @@ await describe('Suite 24: Unified Transport Layer (WebSerial USB + WebSocket Wi-
   const swPath = path.resolve(rootDir, 'sw.js');
   assert(fs.existsSync(swPath), 'sw.js Service Worker file exists in WebControl root');
   const swContent = fs.readFileSync(swPath, 'utf8');
-  assert(swContent.includes("CACHE_NAME = 'stpe-robot-arm-v2'"), 'sw.js defines cache version');
+  assert(/CACHE_NAME = 'stpe-robot-arm-v\d+'/.test(swContent), 'sw.js defines cache version');
   assert(swContent.includes("caches.open(CACHE_NAME)"), 'sw.js implements Cache API pre-caching');
   const staticAssetsMatch = swContent.match(/const STATIC_ASSETS = \[([\s\S]*?)\];/);
   assert(Boolean(staticAssetsMatch), 'sw.js defines a static precache asset list');
@@ -1736,13 +1894,106 @@ await describe('Suite 25: Software Reliability & Fault Audit Regression Suite', 
   tcDwell.stop();
 
   // 11. Stepper J5 Range and Home FK
-  assert(JOINT_LIMITS.j5.min === -90.0 && JOINT_LIMITS.j5.max === 90.0 && JOINT_LIMITS.j5.home === 0.0,
-    'JOINT_LIMITS.j5 specifies stepper range [-90, +90] with neutral 0.0');
-  assert(JOINT_CONFIGS.j5.min === -90.0 && JOINT_CONFIGS.j5.max === 90.0 && JOINT_CONFIGS.j5.default === 0.0,
-    'JOINT_CONFIGS.j5 specifies slider range [-90, +90] with default 0.0');
+  assert(JOINT_LIMITS.j5.min === -120.0 && JOINT_LIMITS.j5.max === 120.0 && JOINT_LIMITS.j5.home === 0.0,
+    'JOINT_LIMITS.j5 specifies stepper range [-120, +120] with neutral 0.0');
+  assert(JOINT_CONFIGS.j5.min === -120.0 && JOINT_CONFIGS.j5.max === 120.0 && JOINT_CONFIGS.j5.default === 0.0,
+    'JOINT_CONFIGS.j5 specifies slider range [-120, +120] with default 0.0');
   const homeFkCheck = forwardKinematics(0, 0, 0, {}, null, 0, 0, 0);
   assert(homeFkCheck.tcp.z > 130.0,
     `Home FK TCP Z is elevated above 130mm (got ${homeFkCheck.tcp.z.toFixed(2)}mm)`);
+  // 12. BUG-01 & BUG-02: Two-State Safety gating on autoSend & ESTOP disarm
+  let previewDispatched = 0;
+  const safetyMc = new MotionController({
+    appState: testState,
+    serialManager: { isConnected: () => true, send: async () => { previewDispatched++; } }
+  });
+  safetyMc.setExecutionMode('preview', false);
+  safetyMc.autoSend = true;
+  safetyMc.setJointTarget('j1', 25.0);
+  safetyMc.nudgeJoint('j2', 5.0);
+  safetyMc.setCartesianTarget(220.0, 0.0, 200.0);
+  safetyMc.nudgeCartesian('z', 10.0);
+  safetyMc.nudgeOrientation('pitch', 5.0);
+  assert(previewDispatched === 0,
+    'BUG-01: Safe Preview mode dispatches 0 packets even when autoSend=true across all jog/nudge APIs');
+
+  safetyMc.setExecutionMode('direct_drive', true);
+  assert(safetyMc.isArmed === true && safetyMc.executionMode === 'direct_drive',
+    'Direct Drive armed state set');
+  testState.setEstop(true);
+  assert(safetyMc.isArmed === false && safetyMc.executionMode === 'preview',
+    'BUG-02: ESTOP immediately disarms Direct Drive and resets executionMode to preview');
+  testState.setEstop(false);
+
+  // 13. BUG-03: Uniform 3D Tool-Frame Step Scaling at Boundary
+  safetyMc.setAllJointTargets({ j1: 45, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0 }, false);
+  safetyMc.setCartesianFrame('tool');
+  safetyMc.cartesian.x = 495;
+  safetyMc.cartesian.y = 0;
+  safetyMc.cartesian.z = 200;
+  const beforeX = safetyMc.cartesian.x;
+  const beforeY = safetyMc.cartesian.y;
+  safetyMc.stepCartesian('z', 1, 20);
+  const dx = safetyMc.cartesian.x - beforeX;
+  const dy = safetyMc.cartesian.y - beforeY;
+  assert(Math.abs(dx) > 0.1 && Math.abs(dx - dy) < 0.05,
+    `BUG-03: Tool-frame step near boundary preserves 45 deg ray direction (dx=${dx.toFixed(2)}, dy=${dy.toFixed(2)})`);
+
+  // 14. BUG-04: sendGhostToRobot dispatches coordinated joint-space spline packet
+  let lastGhostCmd = null;
+  const ghostMc = new MotionController({
+    appState: testState,
+    serialManager: { isConnected: () => true, send: async (cmd) => { lastGhostCmd = cmd; } }
+  });
+  ghostMc.setAllJointTargets({ j1: 15, j2: -20, j3: 45, j4: 0, j5: 10, j6: 0 }, false);
+  await ghostMc.sendGhostToRobot();
+  assert(typeof lastGhostCmd === 'string' && lastGhostCmd.trim().startsWith('<') && lastGhostCmd.trim().endsWith('>'),
+    `BUG-04: sendGhostToRobot dispatches framed joint-space spline packet (got ${JSON.stringify(lastGhostCmd)})`);
+
+  // 15. BUG-06, BUG-07 & BUG-08: TelemetryParser j6, PacketBuilder J4/J5 negative jogs, MockSerialPort 0 deg neutral
+  const parsedJtelem = parseSerialLine('{"j1":10,"j2":20,"j3":30,"j4":-45,"j5":-30,"j6":120,"en":1}');
+  assert(parsedJtelem.j6 === 120 && parsedJtelem.j4 === -45 && parsedJtelem.j5 === -30,
+    'BUG-06: TelemetryParser parses j6 and negative j4/j5 angles in JTELEM');
+  const negJogJ4 = PacketBuilder.buildJogCommand('J4', -45.5);
+  const negJogJ5 = PacketBuilder.buildJogCommand('J5', -60.0);
+  assert(negJogJ4 === 'A4 -45.5\n' && negJogJ5 === 'A5 -60.0\n',
+    'BUG-07: PacketBuilder.buildJogCommand preserves negative angles for J4 and J5 within [-90, 90]');
+  const freshMock = new MockSerialPort();
+  assert(freshMock.j2 === 0 && freshMock.j3 === 0 && freshMock.j4 === 0 && freshMock.j5 === 0 && freshMock.j6 === 0,
+    'BUG-08: MockSerialPort initializes to 6-DOF neutral 0 deg across all joints');
+
+  // 16. BUG-09: TrajectoryController dispatches MOVL for movl waypoints
+  let movlDispatched = [];
+  const tcMovl = new TrajectoryController({
+    appState: testState,
+    serialManager: { isConnected: () => true, send: async () => {} }
+  });
+  tcMovl._sendSerial = (cmd) => { movlDispatched.push(cmd); };
+  tcMovl.setSequence({
+    sequenceName: 'MovlTest',
+    loop: false,
+    waypoints: [{ j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0, dur: 500, moveType: 'movl' }]
+  });
+  tcMovl.play();
+  assert(movlDispatched.some(c => c.startsWith('MOVL ')),
+    'BUG-09: TrajectoryController dispatches MOVL command when waypoint moveType is "movl"');
+  tcMovl.stop();
+
+  // 17. BUG-10 & BUG-11: PresetManager exports j6/moveType & CNC Star preset is within [-90, 90] J5 limits
+  const pmTest = new PresetManager();
+  const exportedJson = JSON.parse(pmTest.exportSequenceJSON({
+    sequenceName: 'ExportCheck',
+    loop: false,
+    waypoints: [{ j1: 0, j2: 0, j3: 0, j4: 15, j5: -25, j6: 90, grip: 45, dur: 1000, moveType: 'movl' }]
+  }));
+  assert(exportedJson.waypoints[0].j6 === 90 && exportedJson.waypoints[0].moveType === 'movl',
+    'BUG-10: PresetManager.exportSequenceJSON preserves j6 and moveType fields');
+  const cncStar = DEFAULT_PRESETS['CNC Star (G-Code)'];
+  const allCncStarValid = cncStar.waypoints.every(wp =>
+    wp.j4 >= -90 && wp.j4 <= 90 && wp.j5 >= -90 && wp.j5 <= 90 && typeof wp.j6 === 'number'
+  );
+  assert(allCncStarValid,
+    'BUG-11: All CNC Star (G-Code) preset waypoints obey 6-DOF J4/J5 [-90, 90] limits and define j6');
 });
 
 // -----------------------------------------------------------------------------

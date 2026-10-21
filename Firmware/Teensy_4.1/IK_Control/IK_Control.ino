@@ -33,6 +33,7 @@
 #include <math.h>
 
 struct SplinePoint { float j1, j2, j3, j4, j5, j6; };
+struct Quat { float w, x, y, z; };  // Unit quaternion (used by movL6DOF SLERP)
 struct Waypoint;
 enum class WristMode : uint8_t {
   LEVEL     = 0,   // tool poziomo (pick & place z boku)
@@ -43,7 +44,11 @@ enum class WristMode : uint8_t {
   PITCH_180 = 5,   // pitch=180°, J5 z parametru
   MANUAL    = 6    // J4 i J5 podane ręcznie
 };
-struct CubicCoeffs { float c0, c1, c2, c3; };
+enum class OpMode : uint8_t { T1_MANUAL_REDUCED = 0, AUTO = 1 };
+volatile OpMode currentOpMode = OpMode::AUTO;
+volatile bool controlledStopReq = false;
+volatile float rampScale = 1.0f;
+struct CubicCoeffs { float c0, c1, c2, c3, c4, c5; };
 struct MotionTrajectory {
   CubicCoeffs coeffJ1;
   CubicCoeffs coeffJ2;
@@ -56,15 +61,22 @@ struct MotionTrajectory {
 };
 // REFACTOR: const& zamiast kopii przez wartość — eliminuje kopiowanie ~40B na stos przy każdym wywołaniu
 SplinePoint calcTangent(const SplinePoint& prev, const SplinePoint& next);
-bool solveCubicHermite(float p0, float p1, float v0, float v1, float duration_s, CubicCoeffs &coeff);
+bool solveCubicHermite(float p0, float p1, float v0, float v1, float duration_s, CubicCoeffs &coeff, float a0 = 0.0f, float a1 = 0.0f);
 void evaluateCubic(const CubicCoeffs &coeff, float t, float &pos, float &vel, float &acc);
-void buildActiveCubicCoeffs(const SplinePoint &p0, const SplinePoint &p1, const SplinePoint &v0, const SplinePoint &v1, float duration_s);
+void buildActiveCubicCoeffs(const SplinePoint &p0, const SplinePoint &p1, const SplinePoint &v0, const SplinePoint &v1, float duration_s, const SplinePoint &a0, const SplinePoint &a1);
 void blendActiveSpline(const Waypoint &wpTarget);
 void applyHoldCurrent();
 void applyRunCurrent();
 void applySpeedOverride();
 
-const char *FIRMWARE_VERSION = "v3.2.0";
+// Shortest-path angle wrapping helper: maps delta to [-180, +180) deg
+static inline float wrapAngleDeltaDeg(float delta) {
+  delta = fmodf(delta + 180.0f, 360.0f);
+  if (delta < 0.0f) delta += 360.0f;
+  return delta - 180.0f;
+}
+
+const char *FIRMWARE_VERSION = "v3.3.0";
 const char *BUILD_DATE = __DATE__;
 const char *BUILD_TIME = __TIME__;
 
@@ -91,6 +103,9 @@ volatile float motionTargetSpeed6 = 0.0f;
 #define motionTargetServo5 motionTargetPos5
 #define motionTargetServo6 motionTargetPos6
 volatile float motionLoopDtUs = 0.0f;
+constexpr float STEP_ISR_FREQ_HZ = 1000000.0f / 30.0f;
+volatile int32_t ddaPhaseAcc[6] = {0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000};
+volatile int32_t ddaPhaseInc[6] = {0, 0, 0, 0, 0, 0};
 volatile float cachedEncAngle1 = 0.0f;
 volatile float cachedEncAngle2 = 0.0f;
 volatile float cachedEncAngle3 = 0.0f;
@@ -235,7 +250,7 @@ const float LIMIT_J1_MIN = -90.0f, LIMIT_J1_MAX =  90.0f;
 const float LIMIT_J2_MIN = -65.0f, LIMIT_J2_MAX = 115.0f;
 const float LIMIT_J3_MIN = -35.0f, LIMIT_J3_MAX = 170.0f;
 const float LIMIT_J4_MIN = -90.0f, LIMIT_J4_MAX =  90.0f;
-const float LIMIT_J5_MIN = -90.0f, LIMIT_J5_MAX =  90.0f;
+const float LIMIT_J5_MIN = -120.0f, LIMIT_J5_MAX = 120.0f;
 const float LIMIT_J6_MIN = -180.0f, LIMIT_J6_MAX = 180.0f;
 
 // Commanded Positions (Closed Loop Targets)
@@ -285,7 +300,7 @@ float MAX_ACCEL_J4 = 20000.0f;
 float MAX_ACCEL_J5 = 20000.0f;
 float MAX_ACCEL_J6 = 20000.0f;
 
-// Jerk limit in steps/s³. High bandwidth for clean cubic spline tracking.
+// Jerk limit in steps/s³. High bandwidth for clean quintic spline tracking.
 float MAX_JERK_J1 = MAX_ACCEL_J1 * 20.0f;
 float MAX_JERK_J2 = MAX_ACCEL_J2 * 20.0f;
 float MAX_JERK_J3 = MAX_ACCEL_J3 * 20.0f;
@@ -293,8 +308,8 @@ float MAX_JERK_J4 = MAX_ACCEL_J4 * 20.0f;
 float MAX_JERK_J5 = MAX_ACCEL_J5 * 20.0f;
 float MAX_JERK_J6 = MAX_ACCEL_J6 * 20.0f;
 
-// Cubic Hermite spline safety multiplier (peak velocity = 1.5 * average velocity)
-float SPLINE_SAFETY_MARGIN = 1.5f;
+// Rest-to-rest quintic peak velocity is 1.875 times average velocity.
+float SPLINE_SAFETY_MARGIN = 1.88f;
 
 // Rate-limiter state (used in velocity-mode update)
 float lastSpdJ1 = 0.0f, lastSpdJ2 = 0.0f, lastSpdJ3 = 0.0f;
@@ -363,6 +378,12 @@ AccelStepper stepper3(AccelStepper::DRIVER, PIN_AXIS3_STEP, PIN_AXIS3_DIR);
 AccelStepper stepper4(AccelStepper::DRIVER, PIN_AXIS4_STEP, PIN_AXIS4_DIR);
 AccelStepper stepper5(AccelStepper::DRIVER, PIN_AXIS5_STEP, PIN_AXIS5_DIR);
 AccelStepper stepper6(AccelStepper::DRIVER, PIN_AXIS6_STEP, PIN_AXIS6_DIR);
+
+inline void setStepperSpeedDDA(uint8_t idx, AccelStepper &s, float stepsPerSec) {
+  (void)s;
+  ddaPhaseInc[idx] = (stepsPerSec == 0.0f)
+      ? 0 : (int32_t)roundf(stepsPerSec * (65536.0f / STEP_ISR_FREQ_HZ));
+}
 
 #define stepperX stepper4
 #define stepperY stepper5
@@ -542,30 +563,30 @@ void stopStreamMode(bool snapToTarget = true) {
   motionTargetSpeed5 = 0.0f;
   motionTargetSpeed6 = 0.0f;
 
-  stepper1.setSpeed(0.0f);
-  stepper2.setSpeed(0.0f);
-  stepper3.setSpeed(0.0f);
-  stepper4.setSpeed(0.0f);
-  stepper5.setSpeed(0.0f);
-  stepper6.setSpeed(0.0f);
+  setStepperSpeedDDA(0, stepper1, 0.0f);
+  setStepperSpeedDDA(1, stepper2, 0.0f);
+  setStepperSpeedDDA(2, stepper3, 0.0f);
+  setStepperSpeedDDA(3, stepper4, 0.0f);
+  setStepperSpeedDDA(4, stepper5, 0.0f);
+  setStepperSpeedDDA(5, stepper6, 0.0f);
 
-  stepper1.moveTo((long)roundf(commandedAngle1 * stepsPerDegAxis1));
-  stepper2.moveTo((long)roundf(commandedAngle2 * stepsPerDegGeared));
-  stepper3.moveTo(j3AngleToSteps(commandedAngle3));
-  stepper4.moveTo(j4AngleToSteps(commandedAngle4));
-  stepper5.moveTo(j5AngleToSteps(commandedAngle5));
-  stepper6.moveTo(j6AngleToSteps(commandedAngle6));
+  stepper1.moveTo((long)roundf(commandedAngle1 * stepsPerDegAxis1) + (long)backlashOffsetSteps[0]);
+  stepper2.moveTo((long)roundf(commandedAngle2 * stepsPerDegGeared) + (long)backlashOffsetSteps[1]);
+  stepper3.moveTo(j3AngleToSteps(commandedAngle3) + (long)backlashOffsetSteps[2]);
+  stepper4.moveTo(j4AngleToSteps(commandedAngle4) + (long)backlashOffsetSteps[3]);
+  stepper5.moveTo(j5AngleToSteps(commandedAngle5) + (long)backlashOffsetSteps[4]);
+  stepper6.moveTo(j6AngleToSteps(commandedAngle6) + (long)backlashOffsetSteps[5]);
   interrupts();
 }
 
 void syncCommandedToStepperPosition() {
   noInterrupts();
-  commandedAngle1 = (float)stepper1.currentPosition() / stepsPerDegAxis1;
-  commandedAngle2 = (float)stepper2.currentPosition() / stepsPerDegGeared;
-  commandedAngle3 = j3StepsToAngle(stepper3.currentPosition());
-  commandedAngle4 = j4StepsToAngle(stepper4.currentPosition());
-  commandedAngle5 = j5StepsToAngle(stepper5.currentPosition());
-  commandedAngle6 = j6StepsToAngle(stepper6.currentPosition());
+  commandedAngle1 = (float)(stepper1.currentPosition() - (long)backlashOffsetSteps[0]) / stepsPerDegAxis1;
+  commandedAngle2 = (float)(stepper2.currentPosition() - (long)backlashOffsetSteps[1]) / stepsPerDegGeared;
+  commandedAngle3 = j3StepsToAngle(stepper3.currentPosition() - (long)backlashOffsetSteps[2]);
+  commandedAngle4 = j4StepsToAngle(stepper4.currentPosition() - (long)backlashOffsetSteps[3]);
+  commandedAngle5 = j5StepsToAngle(stepper5.currentPosition() - (long)backlashOffsetSteps[4]);
+  commandedAngle6 = j6StepsToAngle(stepper6.currentPosition() - (long)backlashOffsetSteps[5]);
 
   streamTargetJ1 = commandedAngle1;
   streamTargetJ2 = commandedAngle2;
@@ -583,35 +604,6 @@ void syncCommandedToStepperPosition() {
   interrupts();
 }
 
-static float applyJerkLimitedSpeed(float desiredSpeed,
-                                   float &currentSpeed,
-                                   float &currentAccel,
-                                   float dt_s,
-                                   float maxSpeed,
-                                   float maxAccel,
-                                   float maxJerk) {
-  if (dt_s <= 0.0f) dt_s = 0.0001f;
-
-  float clampedTarget = constrain(desiredSpeed, -maxSpeed, maxSpeed);
-  float maxSpeedDelta = maxAccel * dt_s;
-  clampedTarget = constrain(clampedTarget,
-                            currentSpeed - maxSpeedDelta,
-                            currentSpeed + maxSpeedDelta);
-
-  float desiredAccel = (clampedTarget - currentSpeed) / dt_s;
-  float maxAccelDelta = maxJerk * dt_s;
-  float limitedAccel = constrain(desiredAccel,
-                                 currentAccel - maxAccelDelta,
-                                 currentAccel + maxAccelDelta);
-
-  float smoothedSpeed = currentSpeed + limitedAccel * dt_s;
-  smoothedSpeed = constrain(smoothedSpeed, -maxSpeed, maxSpeed);
-
-  currentSpeed = smoothedSpeed;
-  currentAccel = limitedAccel;
-  return smoothedSpeed;
-}
-
 SplinePoint calcTangent(const SplinePoint& prev, const SplinePoint& next) {
    SplinePoint v;
    v.j1 = 0.5f * (next.j1 - prev.j1);
@@ -623,35 +615,37 @@ SplinePoint calcTangent(const SplinePoint& prev, const SplinePoint& next) {
    return v;
 }
 
-bool solveCubicHermite(float p0, float p1, float v0, float v1, float duration_s, CubicCoeffs &coeff) {
+bool solveCubicHermite(float p0, float p1, float v0, float v1, float duration_s, CubicCoeffs &coeff, float a0, float a1) {
   if (duration_s < 0.001f) duration_s = 0.001f;
-  float scaledV0 = v0 * duration_s;
-  float scaledV1 = v1 * duration_s;
+  float T = duration_s, T2 = T * T;
   float dp = p1 - p0;
+  float sv0 = v0 * T, sv1 = v1 * T;
+  float sa0 = a0 * T2, sa1 = a1 * T2;
 
   coeff.c0 = p0;
-  coeff.c1 = scaledV0;
-  coeff.c2 = 3.0f * dp - 2.0f * scaledV0 - scaledV1;
-  coeff.c3 = -2.0f * dp + scaledV0 + scaledV1;
+  coeff.c1 = sv0;
+  coeff.c2 = 0.5f * sa0;
+  coeff.c3 = 10.0f * dp - 6.0f * sv0 - 4.0f * sv1 - 1.5f * sa0 + 0.5f * sa1;
+  coeff.c4 = -15.0f * dp + 8.0f * sv0 + 7.0f * sv1 + 1.5f * sa0 - sa1;
+  coeff.c5 = 6.0f * dp - 3.0f * (sv0 + sv1) - 0.5f * sa0 + 0.5f * sa1;
   return true;
 }
 
 void evaluateCubic(const CubicCoeffs &coeff, float t, float &pos, float &vel, float &acc) {
-  float t2 = t * t;
-  float t3 = t2 * t;
+  float t2 = t * t, t3 = t2 * t, t4 = t3 * t, t5 = t4 * t;
 
-  pos = coeff.c0 + coeff.c1 * t + coeff.c2 * t2 + coeff.c3 * t3;
-  vel = coeff.c1 + 2.0f * coeff.c2 * t + 3.0f * coeff.c3 * t2;
-  acc = 2.0f * coeff.c2 + 6.0f * coeff.c3 * t;
+  pos = coeff.c0 + coeff.c1 * t + coeff.c2 * t2 + coeff.c3 * t3 + coeff.c4 * t4 + coeff.c5 * t5;
+  vel = coeff.c1 + 2.0f * coeff.c2 * t + 3.0f * coeff.c3 * t2 + 4.0f * coeff.c4 * t3 + 5.0f * coeff.c5 * t4;
+  acc = 2.0f * coeff.c2 + 6.0f * coeff.c3 * t + 12.0f * coeff.c4 * t2 + 20.0f * coeff.c5 * t3;
 }
 
-void buildActiveCubicCoeffs(const SplinePoint &p0, const SplinePoint &p1, const SplinePoint &v0, const SplinePoint &v1, float duration_s) {
-  solveCubicHermite(p0.j1, p1.j1, v0.j1, v1.j1, duration_s, cubicCoeffJ1);
-  solveCubicHermite(p0.j2, p1.j2, v0.j2, v1.j2, duration_s, cubicCoeffJ2);
-  solveCubicHermite(p0.j3, p1.j3, v0.j3, v1.j3, duration_s, cubicCoeffJ3);
-  solveCubicHermite(p0.j4, p1.j4, v0.j4, v1.j4, duration_s, cubicCoeffJ4);
-  solveCubicHermite(p0.j5, p1.j5, v0.j5, v1.j5, duration_s, cubicCoeffJ5);
-  solveCubicHermite(p0.j6, p1.j6, v0.j6, v1.j6, duration_s, cubicCoeffJ6);
+void buildActiveCubicCoeffs(const SplinePoint &p0, const SplinePoint &p1, const SplinePoint &v0, const SplinePoint &v1, float duration_s, const SplinePoint &a0, const SplinePoint &a1) {
+  solveCubicHermite(p0.j1, p1.j1, v0.j1, v1.j1, duration_s, cubicCoeffJ1, a0.j1, a1.j1);
+  solveCubicHermite(p0.j2, p1.j2, v0.j2, v1.j2, duration_s, cubicCoeffJ2, a0.j2, a1.j2);
+  solveCubicHermite(p0.j3, p1.j3, v0.j3, v1.j3, duration_s, cubicCoeffJ3, a0.j3, a1.j3);
+  solveCubicHermite(p0.j4, p1.j4, v0.j4, v1.j4, duration_s, cubicCoeffJ4, a0.j4, a1.j4);
+  solveCubicHermite(p0.j5, p1.j5, v0.j5, v1.j5, duration_s, cubicCoeffJ5, a0.j5, a1.j5);
+  solveCubicHermite(p0.j6, p1.j6, v0.j6, v1.j6, duration_s, cubicCoeffJ6, a0.j6, a1.j6);
 }
 
 inline void publishActiveTrajectory(const MotionTrajectory &trajectory) {
@@ -797,12 +791,12 @@ void blendActiveSpline(const Waypoint &wpTarget) {
   if (newDuration_s < 0.001f) newDuration_s = 0.001f;
 
   MotionTrajectory newTrajectory;
-  solveCubicHermite(local_sp1.j1, local_sp2.j1, local_sv1.j1, local_sv2.j1, newDuration_s, newTrajectory.coeffJ1);
-  solveCubicHermite(local_sp1.j2, local_sp2.j2, local_sv1.j2, local_sv2.j2, newDuration_s, newTrajectory.coeffJ2);
-  solveCubicHermite(local_sp1.j3, local_sp2.j3, local_sv1.j3, local_sv2.j3, newDuration_s, newTrajectory.coeffJ3);
-  solveCubicHermite(local_sp1.j4, local_sp2.j4, local_sv1.j4, local_sv2.j4, newDuration_s, newTrajectory.coeffJ4);
-  solveCubicHermite(local_sp1.j5, local_sp2.j5, local_sv1.j5, local_sv2.j5, newDuration_s, newTrajectory.coeffJ5);
-  solveCubicHermite(local_sp1.j6, local_sp2.j6, local_sv1.j6, local_sv2.j6, newDuration_s, newTrajectory.coeffJ6);
+  solveCubicHermite(local_sp1.j1, local_sp2.j1, local_sv1.j1, local_sv2.j1, newDuration_s, newTrajectory.coeffJ1, local_sa1.j1, local_sa2.j1);
+  solveCubicHermite(local_sp1.j2, local_sp2.j2, local_sv1.j2, local_sv2.j2, newDuration_s, newTrajectory.coeffJ2, local_sa1.j2, local_sa2.j2);
+  solveCubicHermite(local_sp1.j3, local_sp2.j3, local_sv1.j3, local_sv2.j3, newDuration_s, newTrajectory.coeffJ3, local_sa1.j3, local_sa2.j3);
+  solveCubicHermite(local_sp1.j4, local_sp2.j4, local_sv1.j4, local_sv2.j4, newDuration_s, newTrajectory.coeffJ4, local_sa1.j4, local_sa2.j4);
+  solveCubicHermite(local_sp1.j5, local_sp2.j5, local_sv1.j5, local_sv2.j5, newDuration_s, newTrajectory.coeffJ5, local_sa1.j5, local_sa2.j5);
+  solveCubicHermite(local_sp1.j6, local_sp2.j6, local_sv1.j6, local_sv2.j6, newDuration_s, newTrajectory.coeffJ6, local_sa1.j6, local_sa2.j6);
 
   newTrajectory.durationUs = remainingUs;
   newTrajectory.duration_s = newDuration_s;
@@ -847,8 +841,12 @@ void blendActiveSpline(const Waypoint &wpTarget) {
 
 // ── Tool & Work Frame Offsets ────────────────────────────────────────────
 struct OffsetFrame { float x = 0, y = 0, z = 0; };
-OffsetFrame toolOffset;  // tool-tip offset from J5 centre (mm)
+OffsetFrame toolOffset;  // TCP deviation from nominal tool length, in flange coordinates (mm)
 OffsetFrame workOffset;  // work-object origin shift (mm)
+
+// Four flange poses with the same physical TCP held at a fixed world point.
+struct TcpCalPose { float p5[3]; float R06[3][3]; bool valid = false; };
+TcpCalPose tcpCalPoses[4];
 
 // ── Teach Mode ───────────────────────────────────────────────────────────
 struct TeachPoint { float j1, j2, j3, j4, j5, j6, grip; };
@@ -857,7 +855,7 @@ TeachPoint teachPoints[MAX_TEACH_POINTS];
 uint8_t teachCount   = 0;
 uint8_t teachPlayIdx = 0;
 bool isTeachMode     = false;  // arm in teach-recording mode
-bool isTeachPlaying  = false;
+volatile bool isTeachPlaying = false; // Written by motionLoopISR during a controlled stop.
 
 // ── EEPROM Static Layout Verification ─────────────────────────────────────
 static_assert(EEPROM_TOOL_OFF_ADDR + sizeof(OffsetFrame) <= EEPROM_WORK_OFF_ADDR, "EEPROM: Tool and Work offset regions overlap!");
@@ -915,7 +913,9 @@ void forwardKinematics(float j1_deg, float j2_deg, float j3_deg,
                        float &x, float &y, float &z, bool raw = false,
                        float j4_deg = 0.0f, float j5_deg = 0.0f, float j6_deg = 0.0f);
 void forwardKinematics6DOF(float j1_deg, float j2_deg, float j3_deg, float j4_deg, float j5_deg, float j6_deg,
-                          float &x, float &y, float &z, float &roll_deg, float &pitch_deg, float &yaw_deg, bool raw = false);
+                           float &x, float &y, float &z, float &roll_deg, float &pitch_deg, float &yaw_deg, bool raw = false);
+void captureCurrentWristFrame(TcpCalPose &pose);
+bool solveTcp4Point(float tcpOut[3], float &rmsErrorMm);
 
 // ── Workspace check ──────────────────────────────────────────────────────
 bool checkWorkspace(float j1, float j2, float j3, float j4 = 0.0f, float j5 = 0.0f, float j6 = 0.0f);
@@ -1020,6 +1020,79 @@ void movL(float x2, float y2, float z2, unsigned long duration,
   }
 }
 
+// ================= QUATERNION HELPERS (for MOVL6DOF SLERP) =================
+// Euler convention: ZYX intrinsic, R06 = Rz(yaw) * Ry(pitch) * Rx(roll)
+// (identical to calculateIK6DOF() / forwardKinematics6DOF()).
+static Quat eulerToQuat(float roll_deg, float pitch_deg, float yaw_deg) {
+  const float hr = roll_deg  * DEG_TO_RAD * 0.5f;
+  const float hp = pitch_deg * DEG_TO_RAD * 0.5f;
+  const float hy = yaw_deg   * DEG_TO_RAD * 0.5f;
+  const float cr = cosf(hr), sr = sinf(hr);
+  const float cp = cosf(hp), sp = sinf(hp);
+  const float cy = cosf(hy), sy = sinf(hy);
+
+  Quat q;
+  q.w = cr * cp * cy + sr * sp * sy;
+  q.x = sr * cp * cy - cr * sp * sy;
+  q.y = cr * sp * cy + sr * cp * sy;
+  q.z = cr * cp * sy - sr * sp * cy;
+  return q;
+}
+
+static void quatToEuler(const Quat &q, float &roll_deg, float &pitch_deg, float &yaw_deg) {
+  // roll (X)
+  float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+  float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+  roll_deg = atan2f(sinr_cosp, cosr_cosp) * RAD_TO_DEG;
+
+  // pitch (Y) - clamp asin() argument to avoid NaN at +-90 deg
+  float sinp = constrain(2.0f * (q.w * q.y - q.z * q.x), -1.0f, 1.0f);
+  pitch_deg = asinf(sinp) * RAD_TO_DEG;
+
+  // yaw (Z)
+  float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+  float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+  yaw_deg = atan2f(siny_cosp, cosy_cosp) * RAD_TO_DEG;
+}
+
+static Quat quatSlerp(Quat q1, Quat q2, float t) {
+  float dot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+
+  // Shortest-path hemisphere check (q and -q are the same rotation)
+  if (dot < 0.0f) {
+    q2.w = -q2.w; q2.x = -q2.x; q2.y = -q2.y; q2.z = -q2.z;
+    dot = -dot;
+  }
+
+  float s1, s2;
+  if (dot > 0.9995f) {
+    // Nearly identical orientations: NLERP (avoids division by ~0 sin(theta))
+    s1 = 1.0f - t;
+    s2 = t;
+  } else {
+    float theta0 = acosf(constrain(dot, -1.0f, 1.0f));
+    float theta  = theta0 * t;
+    float sinTheta0 = sinf(theta0);
+    s1 = sinf(theta0 - theta) / sinTheta0;
+    s2 = sinf(theta) / sinTheta0;
+  }
+
+  Quat out;
+  out.w = s1 * q1.w + s2 * q2.w;
+  out.x = s1 * q1.x + s2 * q2.x;
+  out.y = s1 * q1.y + s2 * q2.y;
+  out.z = s1 * q1.z + s2 * q2.z;
+
+  float n = sqrtf(out.w * out.w + out.x * out.x + out.y * out.y + out.z * out.z);
+  if (n > 1e-9f) {
+    float inv = 1.0f / n;
+    out.w *= inv; out.x *= inv; out.y *= inv; out.z *= inv;
+  } else {
+    out = q1; // Degenerate fallback
+  }
+  return out;
+}
+
 // ================= LINEAR CARTESIAN 6-DOF MOVE (MOVL6DOF) =================
 void movL6DOF(float x2, float y2, float z2, float r2, float p2, float yw2, unsigned long duration) {
   float x1, y1, z1, r1, p1, yw1;
@@ -1031,13 +1104,14 @@ void movL6DOF(float x2, float y2, float z2, float r2, float p2, float yw2, unsig
   float dz = z2 - z1;
   float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-  float dr = fabsf(r2 - r1);
-  float dp = fabsf(p2 - p1);
-  float dyw = fabsf(yw2 - yw1);
-  float maxRot = fmaxf(dr, fmaxf(dp, dyw));
+  // Orientation: SLERP between start and target quaternions
+  Quat q1 = eulerToQuat(r1, p1, yw1);
+  Quat q2 = eulerToQuat(r2, p2, yw2);
+  float qdot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+  float totalRotDeg = 2.0f * acosf(constrain(fabsf(qdot), 0.0f, 1.0f)) * RAD_TO_DEG;
 
   int segs = (int)ceilf(dist / 5.0f);
-  int rotSegs = (int)ceilf(maxRot / 5.0f);
+  int rotSegs = (int)ceilf(totalRotDeg / 5.0f);
   if (rotSegs > segs) segs = rotSegs;
   segs = constrain(segs, 1, 30); // Capped to fit within WAYPOINT_QUEUE_SIZE
 
@@ -1047,7 +1121,7 @@ void movL6DOF(float x2, float y2, float z2, float r2, float p2, float yw2, unsig
   }
 
   Serial.print("MOVL6DOF: dist="); Serial.print(dist, 1);
-  Serial.print("mm rot="); Serial.print(maxRot, 1);
+  Serial.print("mm rot="); Serial.print(totalRotDeg, 1);
   Serial.print("deg segs="); Serial.println(segs);
 
   for (int i = 1; i <= segs; i++) {
@@ -1055,9 +1129,9 @@ void movL6DOF(float x2, float y2, float z2, float r2, float p2, float yw2, unsig
     float xi = x1 + dx * t;
     float yi = y1 + dy * t;
     float zi = z1 + dz * t;
-    float ri = r1 + (r2 - r1) * t;
-    float pi = p1 + (p2 - p1) * t;
-    float ywi = yw1 + (yw2 - yw1) * t;
+    Quat qi = quatSlerp(q1, q2, t);
+    float ri, pi, ywi;
+    quatToEuler(qi, ri, pi, ywi);
     calculateIK6DOF(xi, yi, zi, ri, pi, ywi, segDur, true);
   }
 }
@@ -1130,7 +1204,7 @@ void startHoming(bool doJ1, bool doJ2, bool doJ3) {
     stepper2.setSpeed(-stepsPerDegGeared * 20.0f);
   } else if (doJ3) {
     homingState = HOMING_J3_FAST;
-    stepper3.setSpeed(-stepsPerDegGeared * 20.0f);
+    stepper3.setSpeed(-stepsPerDegGeared * 20.0f * J3_STEP_SIGN);
   }
 }
 
@@ -1193,7 +1267,7 @@ void updateHoming() {
           homingState = HOMING_J2_FAST;
           Serial.print("HOMING J2 fast... ");
         } else if (homingDoJ3) {
-          stepper3.setSpeed(-stepsPerDegGeared * 20.0f);
+          stepper3.setSpeed(-stepsPerDegGeared * 20.0f * J3_STEP_SIGN);
           homingState = HOMING_J3_FAST;
           Serial.print("HOMING J3 fast... ");
         } else {
@@ -1249,7 +1323,7 @@ void updateHoming() {
         Serial.println("OK");
         homingRetries = 0; homingStepCount = 0;
         if (homingDoJ3) {
-          stepper3.setSpeed(-stepsPerDegGeared * 20.0f);
+          stepper3.setSpeed(-stepsPerDegGeared * 20.0f * J3_STEP_SIGN);
           homingState = HOMING_J3_FAST;
           Serial.print("HOMING J3 fast... ");
         } else {
@@ -1265,7 +1339,7 @@ void updateHoming() {
     case HOMING_J3_FAST:
       if (stepper3.runSpeed()) homingStepCount++;
       if (digitalRead(PIN_J3_LIMIT) == HIGH) {
-        stepper3.setSpeed(stepsPerDegGeared * SLOW_SPD_DEG);
+        stepper3.setSpeed(stepsPerDegGeared * SLOW_SPD_DEG * J3_STEP_SIGN);
         homingStepCount = 0;
         homingState = HOMING_J3_BACKOFF;
         Serial.print("HOMING J3 backoff... ");
@@ -1274,7 +1348,7 @@ void updateHoming() {
           homingState = HOMING_FAULT;
           Serial.println("ERR:HOME_FAULT_J3");
         } else {
-          stepper3.setSpeed(stepsPerDegGeared * SLOW_SPD_DEG);
+          stepper3.setSpeed(stepsPerDegGeared * SLOW_SPD_DEG * J3_STEP_SIGN);
           homingStepCount = 0;
           homingState = HOMING_J3_BACKOFF;
         }
@@ -1284,7 +1358,7 @@ void updateHoming() {
     case HOMING_J3_BACKOFF:
       if (stepper3.runSpeed()) homingStepCount++;
       if (homingStepCount >= (unsigned long)BACKOFF_STEPS) {
-        stepper3.setSpeed(-stepsPerDegGeared * SLOW_SPD_DEG);
+        stepper3.setSpeed(-stepsPerDegGeared * SLOW_SPD_DEG * J3_STEP_SIGN);
         homingStepCount = 0;
         homingState = HOMING_J3_SLOW;
         Serial.print("slow... ");
@@ -1411,12 +1485,12 @@ void eeprom_load_all() {
   if (!isnan(tmp) && tmp > 0) MAX_ACCEL_J2 = tmp;
   EEPROM.get(EEPROM_MAXACC_ADDR + 8, tmp);
   if (!isnan(tmp) && tmp > 0) MAX_ACCEL_J3 = tmp;
-  MAX_JERK_J1 = MAX_ACCEL_J1 * 10.0f;
-  MAX_JERK_J2 = MAX_ACCEL_J2 * 10.0f;
-  MAX_JERK_J3 = MAX_ACCEL_J3 * 10.0f;
+  MAX_JERK_J1 = MAX_ACCEL_J1 * 20.0f;
+  MAX_JERK_J2 = MAX_ACCEL_J2 * 20.0f;
+  MAX_JERK_J3 = MAX_ACCEL_J3 * 20.0f;
   EEPROM.get(EEPROM_SAFETY_ADDR, tmp);
   if (!isnan(tmp) && tmp >= 1.0f) {
-    if (tmp > 2.0f) tmp = 1.5f; // Automatically migrate legacy 2.5 safety margin to 1.5
+    if (tmp > 2.2f) tmp = 1.88f; // Migrate legacy 2.5 safety margin to the quintic default
     SPLINE_SAFETY_MARGIN = tmp;
   }
 
@@ -1436,33 +1510,9 @@ void eeprom_load_all() {
 void forwardKinematics(float j1_deg, float j2_deg, float j3_deg,
                        float &x, float &y, float &z, bool raw,
                        float j4_deg, float j5_deg, float j6_deg) {
-    float j1r = j1_deg * DEG_TO_RAD;
-    float j2r = j2_deg * DEG_TO_RAD;
-    float j3r = j3_deg * DEG_TO_RAD;
-    float j5r = j5_deg * DEG_TO_RAD;
-
-    float th1 = TH1_0 - j2r;
-    float th2 = TH2_0 - (j2r + j3r);
-
-    float j3_reach = L1 * sinf(th1);
-    float j3_z     = BASE_H + L1 * cosf(th1);
-
-    float j5_reach = j3_reach + L2 * sinf(th2);
-    float j5_z     = j3_z + L2 * cosf(th2);
-
-    float ang_tool = TOOL_REST_ANGLE + (j2r + j3r + j5r);
-    float tcp_reach = j5_reach + TOOL_TOTAL_LEN * cosf(ang_tool);
-    float tcp_z     = j5_z + TOOL_TOTAL_LEN * sinf(ang_tool);
-
-    x = tcp_reach * cosf(j1r);
-    y = tcp_reach * sinf(j1r);
-    z = tcp_z;
-
-    if (!raw) {
-        // Apply inverse offsets to report position in Work Frame
-        x += workOffset.x;  y += workOffset.y;  z += workOffset.z;
-        x -= toolOffset.x;  y -= toolOffset.y;  z -= toolOffset.z;
-    }
+    float dummyRoll, dummyPitch, dummyYaw;
+    forwardKinematics6DOF(j1_deg, j2_deg, j3_deg, j4_deg, j5_deg, j6_deg,
+                           x, y, z, dummyRoll, dummyPitch, dummyYaw, raw);
 }
 
 // ================= BACKLASH EEPROM & MANAGEMENT =================
@@ -1514,6 +1564,150 @@ void parseBacklashCommand(const char *args) {
   } else {
     Serial.println("ERR: Usage: BACKLASH [J<1-6> <deg>]");
   }
+}
+
+// ================= FOUR-POINT TCP CALIBRATION =================
+void captureCurrentWristFrame(TcpCalPose &pose) {
+    const float j1r = commandedAngle1 * DEG_TO_RAD;
+    const float j2r = commandedAngle2 * DEG_TO_RAD;
+    const float j3r = commandedAngle3 * DEG_TO_RAD;
+    const float j4r = commandedAngle4 * DEG_TO_RAD;
+    const float j5r = commandedAngle5 * DEG_TO_RAD;
+    const float j6r = commandedAngle6 * DEG_TO_RAD;
+
+    // Same J5 position and R03 * Rx(J4) * Ry(-J5) * Rx(J6) convention as FK6DOF.
+    const float th1 = TH1_0 - j2r;
+    const float th2 = TH2_0 - (j2r + j3r);
+    const float j5Reach = L1 * sinf(th1) + L2 * sinf(th2);
+    pose.p5[0] = j5Reach * cosf(j1r);
+    pose.p5[1] = j5Reach * sinf(j1r);
+    pose.p5[2] = BASE_H + L1 * cosf(th1) + L2 * cosf(th2);
+
+    const float pitchBase = TOOL_REST_ANGLE + (j2r + j3r);
+    const float c1 = cosf(j1r), s1 = sinf(j1r);
+    const float cp = cosf(pitchBase), sp = sinf(pitchBase);
+    const float R03[3][3] = {
+      { c1 * cp, -s1, -c1 * sp },
+      { s1 * cp,  c1, -s1 * sp },
+      { sp,       0.0f, cp }
+    };
+
+    const float c4 = cosf(j4r), s4 = sinf(j4r);
+    const float c5 = cosf(j5r), s5 = sinf(j5r);
+    const float c6 = cosf(j6r), s6 = sinf(j6r);
+    const float Rx4[3][3] = {
+      { 1.0f, 0.0f, 0.0f },
+      { 0.0f, c4, -s4 },
+      { 0.0f, s4,  c4 }
+    };
+    const float Ry5[3][3] = {
+      { c5, 0.0f, -s5 },
+      { 0.0f, 1.0f, 0.0f },
+      { s5, 0.0f,  c5 }
+    };
+    const float Rx6[3][3] = {
+      { 1.0f, 0.0f, 0.0f },
+      { 0.0f, c6, -s6 },
+      { 0.0f, s6,  c6 }
+    };
+
+    float R35[3][3], R36[3][3];
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        R35[row][col] = Rx4[row][0] * Ry5[0][col] + Rx4[row][1] * Ry5[1][col] + Rx4[row][2] * Ry5[2][col];
+      }
+    }
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        R36[row][col] = R35[row][0] * Rx6[0][col] + R35[row][1] * Rx6[1][col] + R35[row][2] * Rx6[2][col];
+      }
+    }
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) {
+        pose.R06[row][col] = R03[row][0] * R36[0][col] + R03[row][1] * R36[1][col] + R03[row][2] * R36[2][col];
+      }
+    }
+    pose.valid = true;
+}
+
+bool solveTcp4Point(float tcpOut[3], float &rmsErrorMm) {
+    for (int i = 0; i < 4; ++i) {
+      if (!tcpCalPoses[i].valid) return false;
+    }
+
+    // Nine rows of (R_i - R_3) * t = p5_3 - p5_i, accumulated as normal equations.
+    float normal[3][4] = {};
+    for (int i = 0; i < 3; ++i) {
+      for (int row = 0; row < 3; ++row) {
+        float a[3];
+        for (int col = 0; col < 3; ++col) {
+          a[col] = tcpCalPoses[i].R06[row][col] - tcpCalPoses[3].R06[row][col];
+        }
+        const float b = tcpCalPoses[3].p5[row] - tcpCalPoses[i].p5[row];
+        for (int col = 0; col < 3; ++col) {
+          for (int k = 0; k < 3; ++k) normal[col][k] += a[col] * a[k];
+          normal[col][3] += a[col] * b;
+        }
+      }
+    }
+
+    // Partial pivoting; reject pose sets with insufficient orientation diversity.
+    float maxEntry = 0.0f;
+    for (int row = 0; row < 3; ++row) {
+      for (int col = 0; col < 3; ++col) maxEntry = fmaxf(maxEntry, fabsf(normal[row][col]));
+    }
+    if (maxEntry == 0.0f || !isfinite(maxEntry)) return false;
+    for (int pivot = 0; pivot < 3; ++pivot) {
+      int bestRow = pivot;
+      for (int row = pivot + 1; row < 3; ++row) {
+        if (fabsf(normal[row][pivot]) > fabsf(normal[bestRow][pivot])) bestRow = row;
+      }
+      if (fabsf(normal[bestRow][pivot]) <= maxEntry * 1.0e-6f) return false;
+      if (bestRow != pivot) {
+        for (int col = pivot; col < 4; ++col) {
+          const float tmp = normal[pivot][col];
+          normal[pivot][col] = normal[bestRow][col];
+          normal[bestRow][col] = tmp;
+        }
+      }
+      for (int row = pivot + 1; row < 3; ++row) {
+        const float factor = normal[row][pivot] / normal[pivot][pivot];
+        for (int col = pivot; col < 4; ++col) normal[row][col] -= factor * normal[pivot][col];
+      }
+    }
+
+    float solution[3];
+    for (int row = 2; row >= 0; --row) {
+      float rhs = normal[row][3];
+      for (int col = row + 1; col < 3; ++col) rhs -= normal[row][col] * solution[col];
+      solution[row] = rhs / normal[row][row];
+      if (!isfinite(solution[row])) return false;
+    }
+
+    // RMS of the four 3D TCP positions about their centroid, in millimetres.
+    float tcpPositions[4][3], centroid[3] = {};
+    for (int i = 0; i < 4; ++i) {
+      for (int row = 0; row < 3; ++row) {
+        float coordinate = tcpCalPoses[i].p5[row];
+        for (int col = 0; col < 3; ++col) coordinate += tcpCalPoses[i].R06[row][col] * solution[col];
+        tcpPositions[i][row] = coordinate;
+        centroid[row] += coordinate * 0.25f;
+      }
+    }
+    float squaredError = 0.0f;
+    for (int i = 0; i < 4; ++i) {
+      for (int row = 0; row < 3; ++row) {
+        const float error = tcpPositions[i][row] - centroid[row];
+        squaredError += error * error;
+      }
+    }
+    const float rms = sqrtf(squaredError * 0.25f);
+    if (!isfinite(rms)) return false;
+    tcpOut[0] = solution[0] - TOOL_TOTAL_LEN;
+    tcpOut[1] = solution[1];
+    tcpOut[2] = solution[2];
+    rmsErrorMm = rms;
+    return true;
 }
 
 // ================= FORWARD KINEMATICS 6-DOF =================
@@ -1589,17 +1783,17 @@ void forwardKinematics6DOF(float j1_deg, float j2_deg, float j3_deg, float j4_de
       }
     }
 
-    float ux = R06[0][0];
-    float uy = R06[1][0];
-    float uz = R06[2][0];
-
-    x = p5x + TOOL_TOTAL_LEN * ux;
-    y = p5y + TOOL_TOTAL_LEN * uy;
-    z = p5z + TOOL_TOTAL_LEN * uz;
+    const float t_local[3] = {
+      TOOL_TOTAL_LEN + (raw ? 0.0f : toolOffset.x),
+      raw ? 0.0f : toolOffset.y,
+      raw ? 0.0f : toolOffset.z
+    };
+    x = p5x + R06[0][0] * t_local[0] + R06[0][1] * t_local[1] + R06[0][2] * t_local[2];
+    y = p5y + R06[1][0] * t_local[0] + R06[1][1] * t_local[1] + R06[1][2] * t_local[2];
+    z = p5z + R06[2][0] * t_local[0] + R06[2][1] * t_local[1] + R06[2][2] * t_local[2];
 
     if (!raw) {
         x += workOffset.x;  y += workOffset.y;  z += workOffset.z;
-        x -= toolOffset.x;  y -= toolOffset.y;  z -= toolOffset.z;
     }
 
     pitch_deg = atan2f(-R06[2][0], sqrtf(R06[0][0]*R06[0][0] + R06[1][0]*R06[1][0])) * RAD_TO_DEG;
@@ -1670,10 +1864,7 @@ void checkEncoders() {
   static uint8_t j3Violations = 0;
 
   auto getAngleError = [](float target, float actual) -> float {
-    float diff = target - actual;
-    diff = fmodf(diff + 180.0f, 360.0f);
-    if (diff < 0.0f) diff += 360.0f;
-    return fabsf(diff - 180.0f);
+    return fabsf(wrapAngleDeltaDeg(target - actual));
   };
 
   // J1 — Base (Wire2)
@@ -1773,8 +1964,6 @@ void applySpeedOverride() {
   stepper4.setAcceleration(MAX_ACCEL_J4);
   stepper5.setAcceleration(MAX_ACCEL_J5);
   stepper6.setAcceleration(MAX_ACCEL_J6);
-  stepperX.setMaxSpeed(500.0f * speedOverride);
-  stepperY.setMaxSpeed(500.0f * speedOverride);
 }
 
 // (Legacy blocking homeAxes removed in favor of startHoming/updateHoming state machine)
@@ -1867,6 +2056,7 @@ void homeGantry(bool doX, bool doY) {
     }
   }
 
+  applySpeedOverride(); // Restore J4/J5 limits after the gantry homing speed changes.
   // Steppers will auto-disable via the timeout in loop() !
 }
 
@@ -1941,12 +2131,12 @@ void startSegmentFromQueue() {
     }
   }
 
-  // Fritsch-Carlson Monotone Spline Boundary Tangent & Zero-Overshoot Clamping with Corner Scale
+  // Monotone waypoint velocities and C2 acceleration boundary conditions.
   auto computeMonotoneTangents = [cornerScale](float p0, float p1, float p2_next, bool hasNextWp,
-                                               float dt1_s, float dt2_s, float inVel,
+                                               float dt1_s, float dt2_s, float inVel, float inAcc,
                                                float &v0, float &v1, float &a0, float &a1) {
     float dp1 = p1 - p0;
-    a0 = 0.0f;
+    a0 = (fabsf(dp1) < 0.0001f || inVel * dp1 <= 0.0f) ? 0.0f : inAcc;
     a1 = 0.0f;
 
     if (fabsf(dp1) < 0.0001f) {
@@ -1987,18 +2177,24 @@ void startSegmentFromQueue() {
   float inV4 = wasContinuous ? currentVelJ4 : 0.0f;
   float inV5 = wasContinuous ? currentVelJ5 : 0.0f;
   float inV6 = wasContinuous ? currentVelJ6 : 0.0f;
+  float inA1 = wasContinuous ? currentAccJ1 : 0.0f;
+  float inA2 = wasContinuous ? currentAccJ2 : 0.0f;
+  float inA3 = wasContinuous ? currentAccJ3 : 0.0f;
+  float inA4 = wasContinuous ? currentAccJ4 : 0.0f;
+  float inA5 = wasContinuous ? currentAccJ5 : 0.0f;
+  float inA6 = wasContinuous ? currentAccJ6 : 0.0f;
 
-  computeMonotoneTangents(sp1.j1, sp2.j1, nextWp.j1, hasNextWp, dtCurr_s, dtNext_s, inV1, sv1.j1, sv2.j1, sa1.j1, sa2.j1);
-  computeMonotoneTangents(sp1.j2, sp2.j2, nextWp.j2, hasNextWp, dtCurr_s, dtNext_s, inV2, sv1.j2, sv2.j2, sa1.j2, sa2.j2);
-  computeMonotoneTangents(sp1.j3, sp2.j3, nextWp.j3, hasNextWp, dtCurr_s, dtNext_s, inV3, sv1.j3, sv2.j3, sa1.j3, sa2.j3);
-  computeMonotoneTangents(sp1.j4, sp2.j4, nextWp.j4, hasNextWp, dtCurr_s, dtNext_s, inV4, sv1.j4, sv2.j4, sa1.j4, sa2.j4);
-  computeMonotoneTangents(sp1.j5, sp2.j5, nextWp.j5, hasNextWp, dtCurr_s, dtNext_s, inV5, sv1.j5, sv2.j5, sa1.j5, sa2.j5);
-  computeMonotoneTangents(sp1.j6, sp2.j6, nextWp.j6, hasNextWp, dtCurr_s, dtNext_s, inV6, sv1.j6, sv2.j6, sa1.j6, sa2.j6);
+  computeMonotoneTangents(sp1.j1, sp2.j1, nextWp.j1, hasNextWp, dtCurr_s, dtNext_s, inV1, inA1, sv1.j1, sv2.j1, sa1.j1, sa2.j1);
+  computeMonotoneTangents(sp1.j2, sp2.j2, nextWp.j2, hasNextWp, dtCurr_s, dtNext_s, inV2, inA2, sv1.j2, sv2.j2, sa1.j2, sa2.j2);
+  computeMonotoneTangents(sp1.j3, sp2.j3, nextWp.j3, hasNextWp, dtCurr_s, dtNext_s, inV3, inA3, sv1.j3, sv2.j3, sa1.j3, sa2.j3);
+  computeMonotoneTangents(sp1.j4, sp2.j4, nextWp.j4, hasNextWp, dtCurr_s, dtNext_s, inV4, inA4, sv1.j4, sv2.j4, sa1.j4, sa2.j4);
+  computeMonotoneTangents(sp1.j5, sp2.j5, nextWp.j5, hasNextWp, dtCurr_s, dtNext_s, inV5, inA5, sv1.j5, sv2.j5, sa1.j5, sa2.j5);
+  computeMonotoneTangents(sp1.j6, sp2.j6, nextWp.j6, hasNextWp, dtCurr_s, dtNext_s, inV6, inA6, sv1.j6, sv2.j6, sa1.j6, sa2.j6);
 
   wasContinuous = true;
 
   activeSegmentDuration_s = max(0.001f, splineDuration / 1000000.0f);
-  buildActiveCubicCoeffs(sp1, sp2, sv1, sv2, activeSegmentDuration_s);
+  buildActiveCubicCoeffs(sp1, sp2, sv1, sv2, activeSegmentDuration_s, sa1, sa2);
   MotionTrajectory newTrajectory;
   newTrajectory.coeffJ1 = cubicCoeffJ1;
   newTrajectory.coeffJ2 = cubicCoeffJ2;
@@ -2021,21 +2217,52 @@ void stepLoopISR() {
     return;
   }
 
-  if (motionLoopActive && isMovingQueue) {
-    stepper1.runSpeed();
-    stepper2.runSpeed();
-    stepper3.runSpeed();
-    stepper4.runSpeed();
-    stepper5.runSpeed();
-    stepper6.runSpeed();
-  } else if (streamMode) {
-    stepper1.runSpeed();
-    stepper2.runSpeed();
-    stepper3.runSpeed();
-    stepper4.runSpeed();
-    stepper5.runSpeed();
-    stepper6.runSpeed();
+  if ((motionLoopActive && isMovingQueue) || streamMode) {
+    uint8_t stepMask = 0;
+    for (uint8_t idx = 0; idx < 6; ++idx) {
+      const int32_t inc = ddaPhaseInc[idx];
+      if (inc == 0) continue;
+      const int32_t prev = ddaPhaseAcc[idx];
+      // Phase wraps modulo 2^32 without signed-overflow undefined behavior.
+      const int32_t next = (int32_t)((uint32_t)prev + (uint32_t)inc);
+      ddaPhaseAcc[idx] = next;
+      if (((uint32_t)prev >> 16) != ((uint32_t)next >> 16)) stepMask |= (1u << idx);
+    }
+
+    if (stepMask != 0) {
+      if (ddaPhaseInc[0] != 0) digitalWriteFast(PIN_AXIS1_DIR, ddaPhaseInc[0] > 0 ? HIGH : LOW);
+      if (ddaPhaseInc[1] != 0) digitalWriteFast(PIN_AXIS2_DIR, ddaPhaseInc[1] > 0 ? HIGH : LOW);
+      if (ddaPhaseInc[2] != 0) digitalWriteFast(PIN_AXIS3_DIR, ddaPhaseInc[2] > 0 ? HIGH : LOW);
+      if (ddaPhaseInc[3] != 0) digitalWriteFast(PIN_AXIS4_DIR, ddaPhaseInc[3] > 0 ? HIGH : LOW);
+      if (ddaPhaseInc[4] != 0) digitalWriteFast(PIN_AXIS5_DIR, ddaPhaseInc[4] > 0 ? HIGH : LOW);
+      if (ddaPhaseInc[5] != 0) digitalWriteFast(PIN_AXIS6_DIR, ddaPhaseInc[5] > 0 ? HIGH : LOW);
+
+      delayNanoseconds(100);
+
+      if (stepMask & (1u << 0)) digitalWriteFast(PIN_AXIS1_STEP, HIGH);
+      if (stepMask & (1u << 1)) digitalWriteFast(PIN_AXIS2_STEP, HIGH);
+      if (stepMask & (1u << 2)) digitalWriteFast(PIN_AXIS3_STEP, HIGH);
+      if (stepMask & (1u << 3)) digitalWriteFast(PIN_AXIS4_STEP, HIGH);
+      if (stepMask & (1u << 4)) digitalWriteFast(PIN_AXIS5_STEP, HIGH);
+      if (stepMask & (1u << 5)) digitalWriteFast(PIN_AXIS6_STEP, HIGH);
+
+      delayNanoseconds(1500);
+      if (stepMask & (1u << 0)) digitalWriteFast(PIN_AXIS1_STEP, LOW);
+      if (stepMask & (1u << 1)) digitalWriteFast(PIN_AXIS2_STEP, LOW);
+      if (stepMask & (1u << 2)) digitalWriteFast(PIN_AXIS3_STEP, LOW);
+      if (stepMask & (1u << 3)) digitalWriteFast(PIN_AXIS4_STEP, LOW);
+      if (stepMask & (1u << 4)) digitalWriteFast(PIN_AXIS5_STEP, LOW);
+      if (stepMask & (1u << 5)) digitalWriteFast(PIN_AXIS6_STEP, LOW);
+
+      if (stepMask & (1u << 0)) stepper1.setCurrentPosition(stepper1.currentPosition() + (ddaPhaseInc[0] > 0 ? 1L : -1L));
+      if (stepMask & (1u << 1)) stepper2.setCurrentPosition(stepper2.currentPosition() + (ddaPhaseInc[1] > 0 ? 1L : -1L));
+      if (stepMask & (1u << 2)) stepper3.setCurrentPosition(stepper3.currentPosition() + (ddaPhaseInc[2] > 0 ? 1L : -1L));
+      if (stepMask & (1u << 3)) stepper4.setCurrentPosition(stepper4.currentPosition() + (ddaPhaseInc[3] > 0 ? 1L : -1L));
+      if (stepMask & (1u << 4)) stepper5.setCurrentPosition(stepper5.currentPosition() + (ddaPhaseInc[4] > 0 ? 1L : -1L));
+      if (stepMask & (1u << 5)) stepper6.setCurrentPosition(stepper6.currentPosition() + (ddaPhaseInc[5] > 0 ? 1L : -1L));
+    }
   } else {
+    for (uint8_t idx = 0; idx < 6; ++idx) ddaPhaseAcc[idx] = 0x8000;
     stepper1.run();
     stepper2.run();
     stepper3.run();
@@ -2051,8 +2278,6 @@ void motionLoopISR() {
   motionLoopDtUs = (nowUs > lastMotionUs) ? (float)(nowUs - lastMotionUs) : 0.0f;
   lastMotionUs = nowUs;
 
-  if (!motionLoopActive) return;
-
   // Immediate ESTOP Quiescence: halt velocity commands within 1 tick (1 ms)
   if (estopActive) {
     motionTargetSpeed1 = 0.0f;
@@ -2061,23 +2286,75 @@ void motionLoopISR() {
     motionTargetSpeed4 = 0.0f;
     motionTargetSpeed5 = 0.0f;
     motionTargetSpeed6 = 0.0f;
-    stepper1.setSpeed(0.0f);
-    stepper2.setSpeed(0.0f);
-    stepper3.setSpeed(0.0f);
-    stepper4.setSpeed(0.0f);
-    stepper5.setSpeed(0.0f);
-    stepper6.setSpeed(0.0f);
+    setStepperSpeedDDA(0, stepper1, 0.0f);
+    setStepperSpeedDDA(1, stepper2, 0.0f);
+    setStepperSpeedDDA(2, stepper3, 0.0f);
+    setStepperSpeedDDA(3, stepper4, 0.0f);
+    setStepperSpeedDDA(4, stepper5, 0.0f);
+    setStepperSpeedDDA(5, stepper6, 0.0f);
     isMovingQueue = false;
     return;
   }
 
-  if (qHead != qTail && !isMovingQueue) {
+  if (motionLoopActive && qHead != qTail && !isMovingQueue) {
     startSegmentFromQueue();
   }
 
   // Single unified spline evaluation pass
-  if (isMovingQueue) {
-    float currentOverride = max(0.05f, speedOverride);
+  if (motionLoopActive && isMovingQueue) {
+    float effectiveOverride = speedOverride;
+    if (currentOpMode == OpMode::T1_MANUAL_REDUCED && effectiveOverride > 0.15f)
+      effectiveOverride = 0.15f;
+
+    if (controlledStopReq) {
+      rampScale -= 0.004f; // 250 ticks at 1 kHz
+      if (rampScale <= 0.0f) {
+        rampScale = 1.0f;
+        controlledStopReq = false;
+        isMovingQueue = false;
+        isTeachPlaying = false;
+        wasContinuous = false;
+        motionLoopActive = false;
+        qHead = qTail;
+
+        motionTargetSpeed1 = motionTargetSpeed2 = motionTargetSpeed3 = 0.0f;
+        motionTargetSpeed4 = motionTargetSpeed5 = motionTargetSpeed6 = 0.0f;
+        lastSpdJ1 = lastSpdJ2 = lastSpdJ3 = 0.0f;
+        lastSpdJ4 = lastSpdJ5 = lastSpdJ6 = 0.0f;
+        lastAccJ1 = lastAccJ2 = lastAccJ3 = 0.0f;
+        lastAccJ4 = lastAccJ5 = lastAccJ6 = 0.0f;
+        currentVelJ1 = currentVelJ2 = currentVelJ3 = 0.0f;
+        currentVelJ4 = currentVelJ5 = currentVelJ6 = 0.0f;
+        currentAccJ1 = currentAccJ2 = currentAccJ3 = 0.0f;
+        currentAccJ4 = currentAccJ5 = currentAccJ6 = 0.0f;
+        setStepperSpeedDDA(0, stepper1, 0.0f); setStepperSpeedDDA(1, stepper2, 0.0f); setStepperSpeedDDA(2, stepper3, 0.0f);
+        setStepperSpeedDDA(3, stepper4, 0.0f); setStepperSpeedDDA(4, stepper5, 0.0f); setStepperSpeedDDA(5, stepper6, 0.0f);
+
+        const long stopped1 = stepper1.currentPosition(), stopped2 = stepper2.currentPosition();
+        const long stopped3 = stepper3.currentPosition(), stopped4 = stepper4.currentPosition();
+        const long stopped5 = stepper5.currentPosition(), stopped6 = stepper6.currentPosition();
+        stepper1.moveTo(stopped1); stepper2.moveTo(stopped2); stepper3.moveTo(stopped3);
+        stepper4.moveTo(stopped4); stepper5.moveTo(stopped5); stepper6.moveTo(stopped6);
+
+        // The hold loop derives its targets from commandedAngle, so align it with
+        // the stopped steps after accounting for the existing backlash offsets.
+        pidAdj1 = pidAdj2 = pidAdj3 = 0.0f;
+        pid1.integral = pid2.integral = pid3.integral = 0.0f;
+        pid1.lastError = pid2.lastError = pid3.lastError = 0.0f;
+        commandedAngle1 = (stopped1 - (long)backlashOffsetSteps[0]) / stepsPerDegAxis1;
+        commandedAngle2 = (stopped2 - (long)backlashOffsetSteps[1]) / stepsPerDegGeared;
+        commandedAngle3 = (stopped3 - (long)backlashOffsetSteps[2]) / (stepsPerDegGeared * J3_STEP_SIGN);
+        commandedAngle4 = (stopped4 - (long)backlashOffsetSteps[3]) / stepsPerDegAxis4;
+        commandedAngle5 = (stopped5 - (long)backlashOffsetSteps[4]) / stepsPerDegAxis5;
+        commandedAngle6 = (stopped6 - (long)backlashOffsetSteps[5]) / stepsPerDegAxis6;
+        motionTargetPos1 = commandedAngle1; motionTargetPos2 = commandedAngle2; motionTargetPos3 = commandedAngle3;
+        motionTargetPos4 = commandedAngle4; motionTargetPos5 = commandedAngle5; motionTargetPos6 = commandedAngle6;
+        applyHoldCurrent();
+        return;
+      }
+    }
+
+    float currentOverride = max(0.001f, effectiveOverride * rampScale);
     float realDuration_us = splineDuration / currentOverride;
     if (realDuration_us < 1000.0f) realDuration_us = 1000.0f;
     float realDuration_s = realDuration_us / 1000000.0f;
@@ -2100,6 +2377,11 @@ void motionLoopISR() {
     evaluateCubic(activeTrajectory.coeffJ4, t, pos4, velNorm4, accNorm4);
     evaluateCubic(activeTrajectory.coeffJ5, t, pos5, velNorm5, accNorm5);
     evaluateCubic(activeTrajectory.coeffJ6, t, pos6, velNorm6, accNorm6);
+    if (controlledStopReq && t >= 1.0f) {
+      // Stay at the final point of this segment until the stop ramp completes.
+      velNorm1 = velNorm2 = velNorm3 = 0.0f;
+      velNorm4 = velNorm5 = velNorm6 = 0.0f;
+    }
 
     commandedAngle1 = pos1;
     commandedAngle2 = pos2;
@@ -2128,12 +2410,24 @@ void motionLoopISR() {
     float vel5_deg = velNorm5 / realDuration_s;
     float vel6_deg = velNorm6 / realDuration_s;
 
-    float spd1 = constrain(vel1_deg * stepsPerDegAxis1, -MAX_SPEED_J1 * currentOverride, MAX_SPEED_J1 * currentOverride);
-    float spd2 = constrain(vel2_deg * stepsPerDegGeared, -MAX_SPEED_J2 * currentOverride, MAX_SPEED_J2 * currentOverride);
-    float spd3 = constrain(vel3_deg * stepsPerDegGeared * J3_STEP_SIGN, -MAX_SPEED_J3 * currentOverride, MAX_SPEED_J3 * currentOverride);
-    float spd4 = constrain(vel4_deg * stepsPerDegAxis4, -MAX_SPEED_J4 * currentOverride, MAX_SPEED_J4 * currentOverride);
-    float spd5 = constrain(vel5_deg * stepsPerDegAxis5, -MAX_SPEED_J5 * currentOverride, MAX_SPEED_J5 * currentOverride);
-    float spd6 = constrain(vel6_deg * stepsPerDegAxis6, -MAX_SPEED_J6 * currentOverride, MAX_SPEED_J6 * currentOverride);
+    // Close the velocity-mode step loop around the floating-point spline target.
+    const float kPosTrack = 15.0f;
+    const float p1 = useEncoders && jointEnabled[0] && encEnabled[0] ? pidAdj1 : 0.0f;
+    const float p2 = useEncoders && jointEnabled[1] && encEnabled[1] ? pidAdj2 : 0.0f;
+    const float p3 = useEncoders && jointEnabled[2] && encEnabled[2] ? pidAdj3 : 0.0f;
+    const float desSteps1 = (pos1 + p1) * stepsPerDegAxis1 + backlashOffsetSteps[0];
+    const float desSteps2 = (pos2 + p2) * stepsPerDegGeared + backlashOffsetSteps[1];
+    const float desSteps3 = (pos3 + p3) * stepsPerDegGeared * J3_STEP_SIGN + backlashOffsetSteps[2];
+    const float desSteps4 = pos4 * stepsPerDegAxis4 + backlashOffsetSteps[3];
+    const float desSteps5 = pos5 * stepsPerDegAxis5 + backlashOffsetSteps[4];
+    const float desSteps6 = pos6 * stepsPerDegAxis6 + backlashOffsetSteps[5];
+
+    float spd1 = constrain(vel1_deg * stepsPerDegAxis1 + kPosTrack * (desSteps1 - stepper1.currentPosition()), -MAX_SPEED_J1 * currentOverride, MAX_SPEED_J1 * currentOverride);
+    float spd2 = constrain(vel2_deg * stepsPerDegGeared + kPosTrack * (desSteps2 - stepper2.currentPosition()), -MAX_SPEED_J2 * currentOverride, MAX_SPEED_J2 * currentOverride);
+    float spd3 = constrain(vel3_deg * stepsPerDegGeared * J3_STEP_SIGN + kPosTrack * (desSteps3 - stepper3.currentPosition()), -MAX_SPEED_J3 * currentOverride, MAX_SPEED_J3 * currentOverride);
+    float spd4 = constrain(vel4_deg * stepsPerDegAxis4 + kPosTrack * (desSteps4 - stepper4.currentPosition()), -MAX_SPEED_J4 * currentOverride, MAX_SPEED_J4 * currentOverride);
+    float spd5 = constrain(vel5_deg * stepsPerDegAxis5 + kPosTrack * (desSteps5 - stepper5.currentPosition()), -MAX_SPEED_J5 * currentOverride, MAX_SPEED_J5 * currentOverride);
+    float spd6 = constrain(vel6_deg * stepsPerDegAxis6 + kPosTrack * (desSteps6 - stepper6.currentPosition()), -MAX_SPEED_J6 * currentOverride, MAX_SPEED_J6 * currentOverride);
 
     lastSpdJ1 = spd1;
     lastSpdJ2 = spd2;
@@ -2149,14 +2443,14 @@ void motionLoopISR() {
     motionTargetSpeed5 = spd5;
     motionTargetSpeed6 = spd6;
 
-    stepper1.setSpeed(spd1);
-    stepper2.setSpeed(spd2);
-    stepper3.setSpeed(spd3);
-    stepper4.setSpeed(spd4);
-    stepper5.setSpeed(spd5);
-    stepper6.setSpeed(spd6);
+    setStepperSpeedDDA(0, stepper1, spd1);
+    setStepperSpeedDDA(1, stepper2, spd2);
+    setStepperSpeedDDA(2, stepper3, spd3);
+    setStepperSpeedDDA(3, stepper4, spd4);
+    setStepperSpeedDDA(4, stepper5, spd5);
+    setStepperSpeedDDA(5, stepper6, spd6);
 
-    if (splineT >= 1.0f) {
+    if (splineT >= 1.0f && !controlledStopReq) {
       currentVelJ1 = velNorm1 / activeSegmentDuration_s;
       currentVelJ2 = velNorm2 / activeSegmentDuration_s;
       currentVelJ3 = velNorm3 / activeSegmentDuration_s;
@@ -2185,12 +2479,12 @@ void motionLoopISR() {
         motionTargetSpeed4 = 0.0f;
         motionTargetSpeed5 = 0.0f;
         motionTargetSpeed6 = 0.0f;
-        stepper1.setSpeed(0.0f);
-        stepper2.setSpeed(0.0f);
-        stepper3.setSpeed(0.0f);
-        stepper4.setSpeed(0.0f);
-        stepper5.setSpeed(0.0f);
-        stepper6.setSpeed(0.0f);
+        setStepperSpeedDDA(0, stepper1, 0.0f);
+        setStepperSpeedDDA(1, stepper2, 0.0f);
+        setStepperSpeedDDA(2, stepper3, 0.0f);
+        setStepperSpeedDDA(3, stepper4, 0.0f);
+        setStepperSpeedDDA(4, stepper5, 0.0f);
+        setStepperSpeedDDA(5, stepper6, 0.0f);
         lastSpdJ1 = 0.0f; lastSpdJ2 = 0.0f; lastSpdJ3 = 0.0f;
         lastSpdJ4 = 0.0f; lastSpdJ5 = 0.0f; lastSpdJ6 = 0.0f;
         lastAccJ1 = 0.0f; lastAccJ2 = 0.0f; lastAccJ3 = 0.0f;
@@ -2216,12 +2510,9 @@ void motionLoopISR() {
   if (++isrCollCheckTicks >= 50) {
     isrCollCheckTicks = 0;
     if (useEncoders && cachedEncoderValid && (isMovingQueue || streamMode)) {
-      float err1 = fabsf(commandedAngle1 - cachedEncAngle1);
-      float err2 = fabsf(commandedAngle2 - cachedEncAngle2);
-      float err3 = fabsf(commandedAngle3 - cachedEncAngle3);
-      if (err1 > 180.0f) err1 = 360.0f - err1;
-      if (err2 > 180.0f) err2 = 360.0f - err2;
-      if (err3 > 180.0f) err3 = 360.0f - err3;
+      float err1 = fabsf(wrapAngleDeltaDeg(commandedAngle1 - cachedEncAngle1));
+      float err2 = fabsf(wrapAngleDeltaDeg(commandedAngle2 - cachedEncAngle2));
+      float err3 = fabsf(wrapAngleDeltaDeg(commandedAngle3 - cachedEncAngle3));
       if ((encEnabled[0] && err1 > 20.0f) ||
           (encEnabled[1] && err2 > 20.0f) ||
           (encEnabled[2] && err3 > 20.0f)) {
@@ -2276,6 +2567,8 @@ void setup() {
   pinMode(PIN_MICRO_X_DIR, OUTPUT);
   pinMode(PIN_MICRO_Y_STEP, OUTPUT);
   pinMode(PIN_MICRO_Y_DIR, OUTPUT);
+  pinMode(PIN_AXIS6_STEP, OUTPUT);
+  pinMode(PIN_AXIS6_DIR, OUTPUT);
   pinMode(PIN_MICRO_EN, OUTPUT);
   digitalWrite(PIN_MICRO_EN, LOW); // Enabled by default (Pin 12 shared with PIN_WRIST_EN)
   Serial.println("OK");
@@ -2303,12 +2596,7 @@ void setup() {
     delay(10);
     d.toff(4);
     delay(10);
-    d.rms_current(1400); // 1400mA RMS: balanced strong torque without thermal throttling
-    delay(10);
-    d.ihold(16);
-    delay(10);
-    d.irun(28);
-    delay(10);
+    d.rms_current(1400, 0.5f); // 1400mA RMS with 50% hold current
     d.iholddelay(6);
     delay(10);
     d.microsteps(MICROSTEPS); // 16 microsteps base
@@ -2338,11 +2626,6 @@ void setup() {
   stepper4.setMaxSpeed(MAX_SPEED_J4);    stepper4.setAcceleration(MAX_ACCEL_J4);
   stepper5.setMaxSpeed(MAX_SPEED_J5);    stepper5.setAcceleration(MAX_ACCEL_J5);
   stepper6.setMaxSpeed(MAX_SPEED_J6);    stepper6.setAcceleration(MAX_ACCEL_J6);
-
-  stepperX.setMaxSpeed(500.0);
-  stepperX.setAcceleration(500.0);
-  stepperY.setMaxSpeed(500.0);
-  stepperY.setAcceleration(500.0);
 
   loadBacklashFromEEPROM();
   Serial.println("OK");
@@ -2465,7 +2748,7 @@ void setup() {
   Serial.print("Microsteps:        ");
   Serial.println(MICROSTEPS);
 
-  Serial.print("TMC Current:       1800mA");
+  Serial.print("TMC Current:       1400mA RMS");
   Serial.println();
 
   Serial.println("Safety Limits:");
@@ -2516,6 +2799,8 @@ void setup() {
       "  CAL                       - Calibrate encoders to current position");
   Serial.println("  CL_ON                     - Enable closed-loop control");
   Serial.println("  CL_OFF                    - Disable closed-loop control");
+  Serial.println("  MODE T1|AUTO              - Select reduced/manual or automatic speed");
+  Serial.println("  STOP                      - Controlled stop of queued motion");
   Serial.println("  REENABLE                  - Recover drivers from ESTOP");
   Serial.println();
   Serial.println("TEACH & PLAYBACK:");
@@ -2589,9 +2874,6 @@ void loop() {
   if (anyRunning) applyRunCurrent();
   else            applyHoldCurrent();
 
-  stepperX.run();
-  stepperY.run();
-
   // --- ENCODER POLLING (50Hz non-blocking to prevent step pulse starvation) ---
   static unsigned long lastEncPollMs = 0;
   if (millis() - lastEncPollMs >= 20) {
@@ -2652,6 +2934,9 @@ void loop() {
 
       // Acceleration limit (deg/s^2) safely within TMC2209 torque limits
       float maxAcc = 140.0f;
+      float effectiveOverride = speedOverride;
+      if (currentOpMode == OpMode::T1_MANUAL_REDUCED && effectiveOverride > 0.15f)
+        effectiveOverride = 0.15f;
 
       auto updateTracking = [&](float target, volatile float &pos, float &vel, float maxVel) {
         float error = target - pos;
@@ -2668,22 +2953,47 @@ void loop() {
 
         float maxVelDelta = maxAcc * dt;
         vel = constrain(targetSpeed, vel - maxVelDelta, vel + maxVelDelta);
+        vel = constrain(vel, -maxVel, maxVel);
         pos += vel * dt;
       };
 
-      updateTracking(streamTargetJ1, commandedAngle1, streamVelJ1, MAX_SPEED_J1 / stepsPerDegAxis1);
-      updateTracking(streamTargetJ2, commandedAngle2, streamVelJ2, MAX_SPEED_J2 / stepsPerDegGeared);
-      updateTracking(streamTargetJ3, commandedAngle3, streamVelJ3, MAX_SPEED_J3 / stepsPerDegGeared);
-      updateTracking(streamTargetJ4, commandedAngle4, streamVelJ4, MAX_SPEED_J4 / stepsPerDegAxis4);
-      updateTracking(streamTargetJ5, commandedAngle5, streamVelJ5, MAX_SPEED_J5 / stepsPerDegAxis5);
-      updateTracking(streamTargetJ6, commandedAngle6, streamVelJ6, MAX_SPEED_J6 / stepsPerDegAxis6);
+      updateTracking(streamTargetJ1, commandedAngle1, streamVelJ1, MAX_SPEED_J1 * effectiveOverride / stepsPerDegAxis1);
+      updateTracking(streamTargetJ2, commandedAngle2, streamVelJ2, MAX_SPEED_J2 * effectiveOverride / stepsPerDegGeared);
+      updateTracking(streamTargetJ3, commandedAngle3, streamVelJ3, MAX_SPEED_J3 * effectiveOverride / stepsPerDegGeared);
+      updateTracking(streamTargetJ4, commandedAngle4, streamVelJ4, MAX_SPEED_J4 * effectiveOverride / stepsPerDegAxis4);
+      updateTracking(streamTargetJ5, commandedAngle5, streamVelJ5, MAX_SPEED_J5 * effectiveOverride / stepsPerDegAxis5);
+      updateTracking(streamTargetJ6, commandedAngle6, streamVelJ6, MAX_SPEED_J6 * effectiveOverride / stepsPerDegAxis6);
 
-      stepper1.setSpeed(streamVelJ1 * stepsPerDegAxis1);
-      stepper2.setSpeed(streamVelJ2 * stepsPerDegGeared);
-      stepper3.setSpeed(streamVelJ3 * stepsPerDegGeared * J3_STEP_SIGN);
-      stepper4.setSpeed(streamVelJ4 * stepsPerDegAxis4);
-      stepper5.setSpeed(streamVelJ5 * stepsPerDegAxis5);
-      stepper6.setSpeed(streamVelJ6 * stepsPerDegAxis6);
+      applyBacklashComp(0, streamVelJ1 * dt);
+      applyBacklashComp(1, streamVelJ2 * dt);
+      applyBacklashComp(2, streamVelJ3 * dt);
+      applyBacklashComp(3, streamVelJ4 * dt);
+      applyBacklashComp(4, streamVelJ5 * dt);
+      applyBacklashComp(5, streamVelJ6 * dt);
+
+      const float p1 = useEncoders && jointEnabled[0] && encEnabled[0] ? pidAdj1 : 0.0f;
+      const float p2 = useEncoders && jointEnabled[1] && encEnabled[1] ? pidAdj2 : 0.0f;
+      const float p3 = useEncoders && jointEnabled[2] && encEnabled[2] ? pidAdj3 : 0.0f;
+      const float kPosTrack = 15.0f;
+      const float desSteps1 = (commandedAngle1 + p1) * stepsPerDegAxis1 + backlashOffsetSteps[0];
+      const float desSteps2 = (commandedAngle2 + p2) * stepsPerDegGeared + backlashOffsetSteps[1];
+      const float desSteps3 = (commandedAngle3 + p3) * stepsPerDegGeared * J3_STEP_SIGN + backlashOffsetSteps[2];
+      const float desSteps4 = commandedAngle4 * stepsPerDegAxis4 + backlashOffsetSteps[3];
+      const float desSteps5 = commandedAngle5 * stepsPerDegAxis5 + backlashOffsetSteps[4];
+      const float desSteps6 = commandedAngle6 * stepsPerDegAxis6 + backlashOffsetSteps[5];
+
+      const float spd1 = constrain(streamVelJ1 * stepsPerDegAxis1 + kPosTrack * (desSteps1 - stepper1.currentPosition()), -MAX_SPEED_J1 * effectiveOverride, MAX_SPEED_J1 * effectiveOverride);
+      const float spd2 = constrain(streamVelJ2 * stepsPerDegGeared + kPosTrack * (desSteps2 - stepper2.currentPosition()), -MAX_SPEED_J2 * effectiveOverride, MAX_SPEED_J2 * effectiveOverride);
+      const float spd3 = constrain(streamVelJ3 * stepsPerDegGeared * J3_STEP_SIGN + kPosTrack * (desSteps3 - stepper3.currentPosition()), -MAX_SPEED_J3 * effectiveOverride, MAX_SPEED_J3 * effectiveOverride);
+      const float spd4 = constrain(streamVelJ4 * stepsPerDegAxis4 + kPosTrack * (desSteps4 - stepper4.currentPosition()), -MAX_SPEED_J4 * effectiveOverride, MAX_SPEED_J4 * effectiveOverride);
+      const float spd5 = constrain(streamVelJ5 * stepsPerDegAxis5 + kPosTrack * (desSteps5 - stepper5.currentPosition()), -MAX_SPEED_J5 * effectiveOverride, MAX_SPEED_J5 * effectiveOverride);
+      const float spd6 = constrain(streamVelJ6 * stepsPerDegAxis6 + kPosTrack * (desSteps6 - stepper6.currentPosition()), -MAX_SPEED_J6 * effectiveOverride, MAX_SPEED_J6 * effectiveOverride);
+      setStepperSpeedDDA(0, stepper1, spd1);
+      setStepperSpeedDDA(1, stepper2, spd2);
+      setStepperSpeedDDA(2, stepper3, spd3);
+      setStepperSpeedDDA(3, stepper4, spd4);
+      setStepperSpeedDDA(4, stepper5, spd5);
+      setStepperSpeedDDA(5, stepper6, spd6);
 
       if (millis() - streamLastUpdateMs > STREAM_TIMEOUT_MS) {
         stopStreamMode(true);
@@ -2742,7 +3052,6 @@ void loop() {
 void calculateIK(float x, float y, float z, unsigned long duration,
                  WristMode wristMode, float j4_manual_deg, float j5_deg, bool isMovL, float j6_deg) {
     x -= workOffset.x;  y -= workOffset.y;  z -= workOffset.z;
-    x += toolOffset.x;  y += toolOffset.y;  z += toolOffset.z;
 
     Serial.print("IK Target: X="); Serial.print(x);
     Serial.print(" Y="); Serial.print(y);
@@ -2768,18 +3077,19 @@ void calculateIK(float x, float y, float z, unsigned long duration,
     }
 
     // 3. Decouple Wrist Center J5 based on wrist orientation
+    const float effToolLen = TOOL_TOTAL_LEN + toolOffset.x;
     float r5 = r;
     float z5 = z;
     if (wristMode == WristMode::DOWN_0 || wristMode == WristMode::DOWN_90 || wristMode == WristMode::PITCH_90) {
-        z5 = z + TOOL_TOTAL_LEN;
+        z5 = z + effToolLen;
     } else if (wristMode == WristMode::PITCH_180) {
-        z5 = z - TOOL_TOTAL_LEN;
+        z5 = z - effToolLen;
     } else if (wristMode == WristMode::MANUAL) {
         float pitch_rad = j4_manual_deg * DEG_TO_RAD;
-        r5 = fmaxf(0.0f, r - TOOL_TOTAL_LEN * cosf(pitch_rad));
-        z5 = z - TOOL_TOTAL_LEN * sinf(pitch_rad);
+        r5 = fmaxf(0.0f, r - effToolLen * cosf(pitch_rad));
+        z5 = z - effToolLen * sinf(pitch_rad);
     } else {
-        r5 = fmaxf(0.0f, r - TOOL_TOTAL_LEN);
+        r5 = fmaxf(0.0f, r - effToolLen);
     }
 
     float dr = r5;
@@ -2922,7 +3232,6 @@ void calculateIK(float x, float y, float z, unsigned long duration,
 void calculateIK6DOF(float x, float y, float z, float roll_deg, float pitch_deg, float yaw_deg,
                      unsigned long duration, bool isMovL) {
     x -= workOffset.x;  y -= workOffset.y;  z -= workOffset.z;
-    x += toolOffset.x;  y += toolOffset.y;  z += toolOffset.z;
 
     Serial.print("IK6DOF Target: X="); Serial.print(x);
     Serial.print(" Y="); Serial.print(y);
@@ -2946,14 +3255,11 @@ void calculateIK6DOF(float x, float y, float z, float roll_deg, float pitch_deg,
       { -sp,     cp * sr,                cp * cr }
     };
 
-    float ux = R06[0][0];
-    float uy = R06[1][0];
-    float uz = R06[2][0];
-
     // 1. Decouple Wrist Center P5
-    float x5 = x - TOOL_TOTAL_LEN * ux;
-    float y5 = y - TOOL_TOTAL_LEN * uy;
-    float z5 = z - TOOL_TOTAL_LEN * uz;
+    const float t_local[3] = { TOOL_TOTAL_LEN + toolOffset.x, toolOffset.y, toolOffset.z };
+    float x5 = x - (R06[0][0] * t_local[0] + R06[0][1] * t_local[1] + R06[0][2] * t_local[2]);
+    float y5 = y - (R06[1][0] * t_local[0] + R06[1][1] * t_local[1] + R06[1][2] * t_local[2]);
+    float z5 = z - (R06[2][0] * t_local[0] + R06[2][1] * t_local[1] + R06[2][2] * t_local[2]);
 
     // 2. Base J1 (Shoulder singularity damping when r5 ~ 0)
     float r5 = sqrtf(x5 * x5 + y5 * y5);
@@ -3045,20 +3351,19 @@ void calculateIK6DOF(float x, float y, float z, float roll_deg, float pitch_deg,
         return;
     }
 
-    // 4. Forearm Frame R03
+    // 4. Forearm Frame R03 — harmonized with forwardKinematics6DOF()
     float j1r = deg1 * DEG_TO_RAD;
     float j2r = best_j2 * DEG_TO_RAD;
     float j3r = best_j3 * DEG_TO_RAD;
-    float th2 = TH2_0 - (j2r + j3r);
-    float forearm_pitch = HALF_PI - th2;
+    float pitch_base = TOOL_REST_ANGLE + (j2r + j3r);
 
     float c1_ = cosf(j1r), s1_ = sinf(j1r);
-    float cp_ = cosf(forearm_pitch), sp_ = sinf(forearm_pitch);
+    float cp_ = cosf(pitch_base), sp_ = sinf(pitch_base);
 
     float R03[3][3] = {
-      { c1_ * cp_, -s1_, c1_ * sp_ },
-      { s1_ * cp_,  c1_, s1_ * sp_ },
-      { -sp_,        0,  cp_ }
+      { c1_ * cp_, -s1_, -c1_ * sp_ },
+      { s1_ * cp_,  c1_, -s1_ * sp_ },
+      { sp_,       0.0f,  cp_ }
     };
 
     // 5. Wrist Rotation Matrix: R36 = R03^T * R06
@@ -3069,51 +3374,72 @@ void calculateIK6DOF(float x, float y, float z, float roll_deg, float pitch_deg,
       }
     }
 
-    // Decompose R36 into J4, J5, J6 with singularity dampening
+    // Decompose R36 = Rx(j4) * Ry(-j5) * Rx(j6) with smooth singularity blending
+    //   R36[0][0] = c5          R36[0][1] = -s5*s6   R36[0][2] = -s5*c6
+    //   R36[1][0] = -s4*s5      R36[2][0] =  c4*s5
     float cosJ5 = fmaxf(-1.0f, fminf(1.0f, R36[0][0]));
     float sinJ5_sq = R36[1][0] * R36[1][0] + R36[2][0] * R36[2][0];
     float sinJ5 = sqrtf(sinJ5_sq);
 
     float calc_j4, calc_j5, calc_j6;
-    const float WRIST_SINGULARITY_EPS = 0.0436f; // ~2.5 deg
+    const float SING_ZONE_SIN = 0.1736f; // sin(10 deg): start of singularity blend zone
 
-    if (sinJ5 < WRIST_SINGULARITY_EPS) {
-        // Wrist Singularity: J4 and J6 are collinear!
-        calc_j5 = acosf(cosJ5) * RAD_TO_DEG;
-        calc_j4 = commandedAngle4;
-        float totalRoll = atan2f(R36[2][1] - R36[1][2], R36[1][1] + R36[2][2]) * RAD_TO_DEG;
-        calc_j6 = totalRoll - calc_j4;
-        while (calc_j6 > 180.0f) calc_j6 -= 360.0f;
-        while (calc_j6 < -180.0f) calc_j6 += 360.0f;
-    } else {
-        float j5_1 = atan2f(sinJ5, cosJ5) * RAD_TO_DEG;
-        float j4_1 = atan2f(R36[1][0], -R36[2][0]) * RAD_TO_DEG;
-        float j6_1 = atan2f(R36[0][1], R36[0][2]) * RAD_TO_DEG;
+    // Branch 1: sin(j5) > 0
+    float j5_1 = atan2f(sinJ5, cosJ5) * RAD_TO_DEG;
+    float j4_1 = atan2f(-R36[1][0], R36[2][0]) * RAD_TO_DEG;
+    float j6_1 = atan2f(-R36[0][1], -R36[0][2]) * RAD_TO_DEG;
 
-        float j5_2 = atan2f(-sinJ5, cosJ5) * RAD_TO_DEG;
-        float j4_2 = atan2f(-R36[1][0], R36[2][0]) * RAD_TO_DEG;
-        float j6_2 = atan2f(-R36[0][1], -R36[0][2]) * RAD_TO_DEG;
+    // Branch 2: sin(j5) < 0
+    float j5_2 = atan2f(-sinJ5, cosJ5) * RAD_TO_DEG;
+    float j4_2 = atan2f(R36[1][0], -R36[2][0]) * RAD_TO_DEG;
+    float j6_2 = atan2f(R36[0][1], R36[0][2]) * RAD_TO_DEG;
 
-        bool b1_valid = (j4_1 >= LIMIT_J4_MIN - 0.01f && j4_1 <= LIMIT_J4_MAX + 0.01f &&
-                         j5_1 >= LIMIT_J5_MIN - 0.01f && j5_1 <= LIMIT_J5_MAX + 0.01f &&
-                         j6_1 >= LIMIT_J6_MIN - 0.01f && j6_1 <= LIMIT_J6_MAX + 0.01f);
-        bool b2_valid = (j4_2 >= LIMIT_J4_MIN - 0.01f && j4_2 <= LIMIT_J4_MAX + 0.01f &&
-                         j5_2 >= LIMIT_J5_MIN - 0.01f && j5_2 <= LIMIT_J5_MAX + 0.01f &&
-                         j6_2 >= LIMIT_J6_MIN - 0.01f && j6_2 <= LIMIT_J6_MAX + 0.01f);
+    bool b1_valid = (j4_1 >= LIMIT_J4_MIN - 0.01f && j4_1 <= LIMIT_J4_MAX + 0.01f &&
+                     j5_1 >= LIMIT_J5_MIN - 0.01f && j5_1 <= LIMIT_J5_MAX + 0.01f &&
+                     j6_1 >= LIMIT_J6_MIN - 0.01f && j6_1 <= LIMIT_J6_MAX + 0.01f);
+    bool b2_valid = (j4_2 >= LIMIT_J4_MIN - 0.01f && j4_2 <= LIMIT_J4_MAX + 0.01f &&
+                     j5_2 >= LIMIT_J5_MIN - 0.01f && j5_2 <= LIMIT_J5_MAX + 0.01f &&
+                     j6_2 >= LIMIT_J6_MIN - 0.01f && j6_2 <= LIMIT_J6_MAX + 0.01f);
 
-        if (b1_valid && !b2_valid) {
-            calc_j4 = j4_1; calc_j5 = j5_1; calc_j6 = j6_1;
-        } else if (b2_valid && !b1_valid) {
-            calc_j4 = j4_2; calc_j5 = j5_2; calc_j6 = j6_2;
+    // Pick the valid branch closest to the current pose (shortest wrapped angular distance)
+    float dist1 = fabsf(wrapAngleDeltaDeg(j4_1 - commandedAngle4)) +
+                  fabsf(wrapAngleDeltaDeg(j5_1 - commandedAngle5)) +
+                  fabsf(wrapAngleDeltaDeg(j6_1 - commandedAngle6));
+    float dist2 = fabsf(wrapAngleDeltaDeg(j4_2 - commandedAngle4)) +
+                  fabsf(wrapAngleDeltaDeg(j5_2 - commandedAngle5)) +
+                  fabsf(wrapAngleDeltaDeg(j6_2 - commandedAngle6));
+
+    bool useBranch2;
+    if (b1_valid && !b2_valid)      useBranch2 = false;
+    else if (b2_valid && !b1_valid) useBranch2 = true;
+    else                            useBranch2 = (dist2 < dist1);
+
+    float raw_j4 = useBranch2 ? j4_2 : j4_1;
+    float raw_j5 = useBranch2 ? j5_2 : j5_1;
+    float raw_j6 = useBranch2 ? j6_2 : j6_1;
+
+    if (sinJ5 < SING_ZONE_SIN) {
+        // Near wrist singularity: J4 and J6 become collinear. Blend smoothly (Hermite)
+        // from "hold J4, put all roll into J6" (w=0) to the raw solution (w=1).
+        float u = constrain(sinJ5 / SING_ZONE_SIN, 0.0f, 1.0f);
+        float w = u * u * (3.0f - 2.0f * u);
+
+        calc_j5 = raw_j5;
+        calc_j4 = commandedAngle4 + w * wrapAngleDeltaDeg(raw_j4 - commandedAngle4);
+
+        float totalRoll, sing_j6;
+        if (cosJ5 >= 0.0f) {
+            totalRoll = atan2f(R36[2][1] - R36[1][2], R36[1][1] + R36[2][2]) * RAD_TO_DEG;
+            sing_j6 = wrapAngleDeltaDeg(totalRoll - calc_j4);
         } else {
-            float dist1 = fabsf(j4_1 - commandedAngle4) + fabsf(j5_1 - commandedAngle5) + fabsf(j6_1 - commandedAngle6);
-            float dist2 = fabsf(j4_2 - commandedAngle4) + fabsf(j5_2 - commandedAngle5) + fabsf(j6_2 - commandedAngle6);
-            if (dist2 < dist1) {
-                calc_j4 = j4_2; calc_j5 = j5_2; calc_j6 = j6_2;
-            } else {
-                calc_j4 = j4_1; calc_j5 = j5_1; calc_j6 = j6_1;
-            }
+            totalRoll = atan2f(R36[1][2] + R36[2][1], R36[1][1] - R36[2][2]) * RAD_TO_DEG;
+            sing_j6 = wrapAngleDeltaDeg(calc_j4 - totalRoll);
         }
+        calc_j6 = sing_j6 + w * wrapAngleDeltaDeg(raw_j6 - sing_j6);
+    } else {
+        calc_j4 = raw_j4;
+        calc_j5 = raw_j5;
+        calc_j6 = raw_j6;
     }
 
     calc_j4 = clampJ(calc_j4, LIMIT_J4_MIN, LIMIT_J4_MAX, was_clamped);
@@ -3145,6 +3471,10 @@ void moveToAngles(float t1, float t2, float t3, unsigned long duration_ms,
         Serial.println("ERR: Motion rejected - ESTOP is active");
         return;
     }
+    if (controlledStopReq) {
+        Serial.println("ERR: Motion rejected - controlled stop in progress");
+        return;
+    }
     t1 = constrain(t1, LIMIT_J1_MIN, LIMIT_J1_MAX);
     t2 = constrain(t2, LIMIT_J2_MIN, LIMIT_J2_MAX);
     t3 = constrain(t3, LIMIT_J3_MIN, LIMIT_J3_MAX);
@@ -3168,6 +3498,7 @@ void moveToAngles(float t1, float t2, float t3, unsigned long duration_ms,
         streamTargetJ4 = cur_t4;
         streamTargetJ5 = cur_t5;
         streamTargetJ6 = cur_t6;
+        streamLastUpdateMs = millis();
         if (!streamMode) {
             streamVelJ1 = streamVelJ2 = streamVelJ3 = streamVelJ4 = streamVelJ5 = streamVelJ6 = 0.0f;
             lastStreamMicros = 0;
@@ -3217,6 +3548,10 @@ void moveToAngles(float t1, float t2, float t3, unsigned long duration_ms,
 // Poprzednio każda oś miała 10-liniowy kopipejst różniący się tylko numerem.
 static void handleStreamJog(int axis, float delta) {
   if (axis < 1 || axis > 6) return;
+  if (controlledStopReq) {
+    Serial.println("ERR: Jog rejected - controlled stop in progress");
+    return;
+  }
   if (!jointEnabled[axis - 1]) {
     Serial.printf("WARN: J%d disabled\n", axis);
     return;
@@ -3265,15 +3600,63 @@ void parseCommand(const char *command, float value) {
     if (strcmp(command, "REENABLE") != 0 && strcmp(command, "ESTOP") != 0 &&
         strcmp(command, "STATUS") != 0 && strcmp(command, "POS") != 0 &&
         strcmp(command, "CALDUMP") != 0 && strcmp(command, "VER") != 0 &&
+        strncmp(command, "MODE ", 5) != 0 &&
         strncmp(command, "GET", 3) != 0) {
       Serial.println("ERR: Motion rejected - ESTOP is active. Send REENABLE first.");
       return;
     }
   }
 
-  if (strcmp(command, "MOV") == 0) {
+  if (strcmp(command, "MODE T1") == 0) {
+    currentOpMode = OpMode::T1_MANUAL_REDUCED;
+    Serial.println("MODE: T1 (15% maximum speed)");
+    sendACK();
+    return;
+  }
+  else if (strcmp(command, "MODE AUTO") == 0) {
+    currentOpMode = OpMode::AUTO;
+    Serial.println("MODE: AUTO");
+    sendACK();
+    return;
+  }
+  else if (strcmp(command, "MOV") == 0) {
     // MOV command is handled in processInput; no action needed here.
     return;
+  }
+  else if (strcmp(command, "TCPCAL") == 0) {
+    const int index = (int)value;
+    if (index < 1 || index > 4 || value != (float)index) {
+      Serial.println("ERR: TCPCAL <1-4>");
+      return;
+    }
+    captureCurrentWristFrame(tcpCalPoses[index - 1]);
+    Serial.print("TCPCAL: Pose "); Serial.print(index); Serial.println(" recorded");
+  }
+  else if (strcmp(command, "TCPCAL SOLVE") == 0) {
+    for (int i = 0; i < 4; ++i) {
+      if (!tcpCalPoses[i].valid) {
+        Serial.println("ERR: TCPCAL needs all 4 poses");
+        return;
+      }
+    }
+    float tcp[3], rmsErrorMm;
+    if (!solveTcp4Point(tcp, rmsErrorMm)) {
+      Serial.println("ERR: TCPCAL singular or invalid pose set; capture more varied orientations");
+      return;
+    }
+    toolOffset.x = tcp[0];
+    toolOffset.y = tcp[1];
+    toolOffset.z = tcp[2];
+    scheduleEepromSave();
+    Serial.print("TCPCAL: TCP X="); Serial.print(tcp[0], 3);
+    Serial.print(" Y="); Serial.print(tcp[1], 3);
+    Serial.print(" Z="); Serial.print(tcp[2], 3);
+    Serial.print(" mm, RMS="); Serial.print(rmsErrorMm, 3);
+    Serial.println(" mm (EEPROM save scheduled)");
+  }
+  else if (strcmp(command, "TCPCAL CLEAR") == 0) {
+    for (int i = 0; i < 4; ++i) tcpCalPoses[i].valid = false;
+    Serial.println("TCPCAL: 4 poses cleared");
   }
   else if (strcmp(command, "D1") == 0) {
     handleStreamJog(1, value);
@@ -3288,9 +3671,9 @@ void parseCommand(const char *command, float value) {
   } else if (strcmp(command, "D6") == 0) {
     handleStreamJog(6, value);
   } else if (strcmp(command, "DX") == 0) {
-    stepperX.move((long)value);
+    handleStreamJog(4, value / stepsPerDegAxis4);
   } else if (strcmp(command, "DY") == 0) {
-    stepperY.move((long)value);
+    handleStreamJog(5, value / stepsPerDegAxis5);
   } else if (strcmp(command, "A4") == 0) {
     float v = constrain(value, LIMIT_J4_MIN, LIMIT_J4_MAX);
     moveToAngles(commandedAngle1, commandedAngle2, commandedAngle3, 1000, false, v, commandedAngle5, false, commandedAngle6);
@@ -3307,8 +3690,11 @@ void parseCommand(const char *command, float value) {
       printBacklash();
     }
   } else if (strcmp(command, "MS") == 0) {
-    stepperX.setMaxSpeed(value);
-    stepperY.setMaxSpeed(value);
+    if (value > 0.0f) {
+      MAX_SPEED_J4 = value;
+      MAX_SPEED_J5 = value;
+      applySpeedOverride();
+    }
   } else if (strcmp(command, "HOMEJ1") == 0) {
     startHoming(true, false, false);
   } else if (strcmp(command, "HOMEJ2") == 0) {
@@ -3510,8 +3896,18 @@ void parseCommand(const char *command, float value) {
     }
     Serial.println("Drivers re-enabled");
   } else if (strcmp(command, "ESTOP") == 0) {
+    noInterrupts();
     estopActive = true;
+    controlledStopReq = false;
+    rampScale = 1.0f;
     calTestActive = false;
+    setStepperSpeedDDA(0, stepper1, 0.0f);
+    setStepperSpeedDDA(1, stepper2, 0.0f);
+    setStepperSpeedDDA(2, stepper3, 0.0f);
+    setStepperSpeedDDA(3, stepper4, 0.0f);
+    setStepperSpeedDDA(4, stepper5, 0.0f);
+    setStepperSpeedDDA(5, stepper6, 0.0f);
+    interrupts();
     // EMERGENCY STOP: Halt all motion immediately
     if (streamMode) stopStreamMode(false);
     stepper1.stop();
@@ -3520,8 +3916,6 @@ void parseCommand(const char *command, float value) {
     stepper4.stop();
     stepper5.stop();
     stepper6.stop();
-    stepperX.stop();
-    stepperY.stop();
 
     // Physically disable drivers (release holding torque)
     digitalWrite(PIN_AXIS1_EN, HIGH);
@@ -3636,37 +4030,37 @@ void parseCommand(const char *command, float value) {
         if (accel <= 0.0f) { Serial.println("ERR: Accel must be > 0"); return; }
         if (axis == 1) {
           MAX_ACCEL_J1 = accel;
-          MAX_JERK_J1 = MAX_ACCEL_J1 * 10.0f;
+          MAX_JERK_J1 = MAX_ACCEL_J1 * 20.0f;
           stepper1.setAcceleration(MAX_ACCEL_J1);
           scheduleEepromSave();
           Serial.printf("J1 Max Accel set to: %.1f\n", MAX_ACCEL_J1);
         } else if (axis == 2) {
           MAX_ACCEL_J2 = accel;
-          MAX_JERK_J2 = MAX_ACCEL_J2 * 10.0f;
+          MAX_JERK_J2 = MAX_ACCEL_J2 * 20.0f;
           stepper2.setAcceleration(MAX_ACCEL_J2);
           scheduleEepromSave();
           Serial.printf("J2 Max Accel set to: %.1f\n", MAX_ACCEL_J2);
         } else if (axis == 3) {
           MAX_ACCEL_J3 = accel;
-          MAX_JERK_J3 = MAX_ACCEL_J3 * 10.0f;
+          MAX_JERK_J3 = MAX_ACCEL_J3 * 20.0f;
           stepper3.setAcceleration(MAX_ACCEL_J3);
           scheduleEepromSave();
           Serial.printf("J3 Max Accel set to: %.1f\n", MAX_ACCEL_J3);
         } else if (axis == 4) {
           MAX_ACCEL_J4 = accel;
-          MAX_JERK_J4 = MAX_ACCEL_J4 * 10.0f;
+          MAX_JERK_J4 = MAX_ACCEL_J4 * 20.0f;
           stepper4.setAcceleration(MAX_ACCEL_J4);
           scheduleEepromSave();
           Serial.printf("J4 Max Accel set to: %.1f\n", MAX_ACCEL_J4);
         } else if (axis == 5) {
           MAX_ACCEL_J5 = accel;
-          MAX_JERK_J5 = MAX_ACCEL_J5 * 10.0f;
+          MAX_JERK_J5 = MAX_ACCEL_J5 * 20.0f;
           stepper5.setAcceleration(MAX_ACCEL_J5);
           scheduleEepromSave();
           Serial.printf("J5 Max Accel set to: %.1f\n", MAX_ACCEL_J5);
         } else if (axis == 6) {
           MAX_ACCEL_J6 = accel;
-          MAX_JERK_J6 = MAX_ACCEL_J6 * 10.0f;
+          MAX_JERK_J6 = MAX_ACCEL_J6 * 20.0f;
           stepper6.setAcceleration(MAX_ACCEL_J6);
           scheduleEepromSave();
           Serial.printf("J6 Max Accel set to: %.1f\n", MAX_ACCEL_J6);
@@ -3705,7 +4099,7 @@ void parseCommand(const char *command, float value) {
     Serial.println("Starting round-trip sweep to detect step loss.");
     Serial.println("Sequence:");
     Serial.println("  1. J1: 0 -> 80 -> -80 -> 0");
-    Serial.println("  2. J2: -90 -> -10 -> -90");
+    Serial.println("  2. J2: -50 -> -10 -> -50");
     Serial.println("  3. J3: 90 -> 10 -> 90");
     Serial.println("Please inspect the arm visually. Each joint must return exactly to home.");
 
@@ -3720,15 +4114,15 @@ void parseCommand(const char *command, float value) {
     calTestStartEnc2 = encEnabled[1] ? getEncoderAngle(readAS5600(Wire),  enc2Offset) : CAL_ENC_NO_DATA;
     calTestStartEnc3 = encEnabled[2] ? getEncoderAngle(readAS5600(Wire1), enc3Offset) : CAL_ENC_NO_DATA;
 
-    queueCalibrationWaypoint(80.0f, -90.0f, 90.0f, 2500);
-    queueCalibrationWaypoint(-80.0f, -90.0f, 90.0f, 4000);
-    queueCalibrationWaypoint(0.0f, -90.0f, 90.0f, 2500);
+    queueCalibrationWaypoint(80.0f, -50.0f, 90.0f, 2500);
+    queueCalibrationWaypoint(-80.0f, -50.0f, 90.0f, 4000);
+    queueCalibrationWaypoint(0.0f, -50.0f, 90.0f, 2500);
 
     queueCalibrationWaypoint(0.0f, -10.0f, 90.0f, 2500);
-    queueCalibrationWaypoint(0.0f, -90.0f, 90.0f, 2500);
+    queueCalibrationWaypoint(0.0f, -50.0f, 90.0f, 2500);
 
-    queueCalibrationWaypoint(0.0f, -90.0f, 10.0f, 2500);
-    queueCalibrationWaypoint(0.0f, -90.0f, 90.0f, 2500);
+    queueCalibrationWaypoint(0.0f, -50.0f, 10.0f, 2500);
+    queueCalibrationWaypoint(0.0f, -50.0f, 90.0f, 2500);
   }
   else if (strcmp(command, "JTELEM") == 0) {
     useJsonTelemetry = (value != 0.0f);
@@ -3736,9 +4130,32 @@ void parseCommand(const char *command, float value) {
     Serial.println(useJsonTelemetry ? "ENABLED" : "DISABLED");
   }
   else if (strcmp(command, "STOP") == 0) {
+    noInterrupts();
+    bool queuedMotion = isMovingQueue && motionLoopActive;
+    if (queuedMotion) {
+      if (!controlledStopReq) rampScale = 1.0f;
+      controlledStopReq = true;
+      calTestActive = false;
+      isTeachPlaying = false;
+    }
+    interrupts();
+    if (queuedMotion) {
+      Serial.println("STOP: Category 1 controlled deceleration...");
+      sendACK();
+      return;
+    }
+
     calTestActive = false;
     if (streamMode) stopStreamMode(false);
     noInterrupts();
+    setStepperSpeedDDA(0, stepper1, 0.0f);
+    setStepperSpeedDDA(1, stepper2, 0.0f);
+    setStepperSpeedDDA(2, stepper3, 0.0f);
+    setStepperSpeedDDA(3, stepper4, 0.0f);
+    setStepperSpeedDDA(4, stepper5, 0.0f);
+    setStepperSpeedDDA(5, stepper6, 0.0f);
+    controlledStopReq = false;
+    rampScale = 1.0f;
     qHead = qTail;
     isMovingQueue = false;
     isTeachPlaying = false;
@@ -3981,6 +4398,7 @@ void processInput(Stream &stream, char *buffer, uint8_t &pos, size_t bufSize) {
             if (strncmp(p, "REENABLE", 8) != 0 && strncmp(p, "ESTOP", 5) != 0 &&
                 strncmp(p, "STATUS", 6) != 0 && strncmp(p, "POS", 3) != 0 &&
                 strncmp(p, "CALDUMP", 7) != 0 && strncmp(p, "VER", 3) != 0 &&
+                strncmp(p, "MODE ", 5) != 0 &&
                 strncmp(p, "GET", 3) != 0) {
               Serial.println("ERR: Motion rejected - ESTOP is active. Send REENABLE first.");
               pos = 0;
@@ -3990,6 +4408,12 @@ void processInput(Stream &stream, char *buffer, uint8_t &pos, size_t bufSize) {
 
           if (strncmp(p, "SAVE ", 5) == 0 || strncmp(p, "LOAD ", 5) == 0 || strncmp(p, "RUN ", 4) == 0) {
             Serial.println("ERR: SD support disabled");
+          } else if (strncmp(p, "MODE", 4) == 0 && (p[4] == ' ' || p[4] == '\0')) {
+            const char *arg = p + 4;
+            while (*arg == ' ') ++arg;
+            if (strcmp(arg, "T1") == 0) parseCommand("MODE T1", 0.0f);
+            else if (strcmp(arg, "AUTO") == 0) parseCommand("MODE AUTO", 0.0f);
+            else Serial.println("ERR: MODE [T1|AUTO]");
           } else if (strncmp(p, "GRIP", 4) == 0) {
             if (strcmp(p, "GRIP OPEN") == 0) {
               setGripper(0.0f);
@@ -4012,6 +4436,14 @@ void processInput(Stream &stream, char *buffer, uint8_t &pos, size_t bufSize) {
             } else {
               Serial.println("ERR: TEACH [START|RECORD|STOP|PLAY|CLEAR] or TEACH <0-4>");
             }
+          } else if (strncmp(p, "TCPCAL", 6) == 0 && (p[6] == ' ' || p[6] == '\0')) {
+            const char *arg = p + 6;
+            while (*arg == ' ') ++arg;
+            if (strcmp(arg, "SOLVE") == 0) parseCommand("TCPCAL SOLVE", 0.0f);
+            else if (strcmp(arg, "CLEAR") == 0) parseCommand("TCPCAL CLEAR", 0.0f);
+            else if (arg[0] >= '1' && arg[0] <= '4' && arg[1] == '\0')
+              parseCommand("TCPCAL", (float)(arg[0] - '0'));
+            else Serial.println("ERR: TCPCAL <1-4|SOLVE|CLEAR>");
           } else if (strncmp(p, "MOVL", 4) == 0) {
             float x = 0.0f, y = 0.0f, z = 0.0f, j4m = 0.0f, j5m = 0.0f, j6m = 0.0f;
             WristMode wMode = WristMode::LEVEL;
@@ -4042,7 +4474,7 @@ void processInput(Stream &stream, char *buffer, uint8_t &pos, size_t bufSize) {
             } else {
               Serial.println("ERR: Invalid MOV format (Expect MOV X# Y# Z#)");
             }
-          } else if (strncmp(p, "HOME ", 5) == 0 || strncmp(p, "MAXSPD ", 7) == 0 || strncmp(p, "MAXACC ", 7) == 0) {
+          } else if (strncmp(p, "HOME ", 5) == 0 || strncmp(p, "MAXSPD ", 7) == 0 || strncmp(p, "MAXACC ", 7) == 0 || strncmp(p, "BACKLASH ", 9) == 0) {
             parseCommand(p, 0.0f);
           } else {
             char *sp = strchr(p, ' ');
@@ -4207,17 +4639,9 @@ void parsePacket(const char* data) {
     return;
   }
 
+  if (fabsf(dx) > 0.5f) j4 = constrain(j4 + (dx / stepsPerDegAxis4), LIMIT_J4_MIN, LIMIT_J4_MAX);
+  if (fabsf(dy) > 0.5f) j5 = constrain(j5 + (dy / stepsPerDegAxis5), LIMIT_J5_MIN, LIMIT_J5_MAX);
   moveToAngles(angle1, angle2, angle3, duration, false, j4, j5, false, j6);
-  values[5] = dx;
-  values[6] = dy;
-
-  // Micro Manipulator (Relative/Incremental)
-  if ((long)values[5] != 0) {
-    stepperX.move((long)values[5]);
-  }
-  if ((long)values[6] != 0) {
-    stepperY.move((long)values[6]);
-  }
 }
 
 // ================= CLOSED LOOP CONTROL =================
@@ -4329,6 +4753,10 @@ void updateClosedLoop() {
 
 // ================= CALIBRATION TEST HELPERS =================
 void queueCalibrationWaypoint(float t1, float t2, float t3, unsigned long duration_ms) {
+  t1 = constrain(t1, LIMIT_J1_MIN, LIMIT_J1_MAX);
+  t2 = constrain(t2, LIMIT_J2_MIN, LIMIT_J2_MAX);
+  t3 = constrain(t3, LIMIT_J3_MIN, LIMIT_J3_MAX);
+
   noInterrupts();
   uint8_t nextHead = (qHead + 1) % WAYPOINT_QUEUE_SIZE;
   if (nextHead == qTail) {
@@ -4352,7 +4780,7 @@ void checkCalTestResults() {
   if (encEnabled[0] && calTestStartEnc1 != CAL_ENC_NO_DATA) {
     anyEnc = true;
     float end1 = getEncoderAngle(readAS5600(Wire2), enc1Offset);
-    float drift = fabsf(end1 - calTestStartEnc1);
+    float drift = fabsf(wrapAngleDeltaDeg(end1 - calTestStartEnc1));
     Serial.printf("J1 (Base) Start: %.2f, End: %.2f, Drift: %.2f deg\n", calTestStartEnc1, end1, drift);
     if (drift > 1.0f) {
       Serial.println("  [WARN] J1 drift detected! Consider reducing MAX_SPEED_J1 or MAX_ACCEL_J1.");
@@ -4364,7 +4792,7 @@ void checkCalTestResults() {
   if (encEnabled[1] && calTestStartEnc2 != CAL_ENC_NO_DATA) {
     anyEnc = true;
     float end2 = getEncoderAngle(readAS5600(Wire), enc2Offset);
-    float drift = fabsf(end2 - calTestStartEnc2);
+    float drift = fabsf(wrapAngleDeltaDeg(end2 - calTestStartEnc2));
     Serial.printf("J2 (Shoulder) Start: %.2f, End: %.2f, Drift: %.2f deg\n", calTestStartEnc2, end2, drift);
     if (drift > 1.0f) {
       Serial.println("  [WARN] J2 drift detected! Consider reducing MAX_SPEED_J2 or MAX_ACCEL_J2.");
@@ -4376,7 +4804,7 @@ void checkCalTestResults() {
   if (encEnabled[2] && calTestStartEnc3 != CAL_ENC_NO_DATA) {
     anyEnc = true;
     float end3 = getEncoderAngle(readAS5600(Wire1), enc3Offset);
-    float drift = fabsf(end3 - calTestStartEnc3);
+    float drift = fabsf(wrapAngleDeltaDeg(end3 - calTestStartEnc3));
     Serial.printf("J3 (Elbow) Start: %.2f, End: %.2f, Drift: %.2f deg\n", calTestStartEnc3, end3, drift);
     if (drift > 1.0f) {
       Serial.println("  [WARN] J3 drift detected! Consider reducing MAX_SPEED_J3 or MAX_ACCEL_J3.");

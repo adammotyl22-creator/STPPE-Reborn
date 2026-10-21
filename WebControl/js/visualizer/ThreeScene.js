@@ -81,19 +81,87 @@ export class ThreeScene {
     if (this.container && this.container.appendChild && this.renderer.domElement) {
       this.container.appendChild(this.renderer.domElement);
     }
+
+    this._initStudioEnvironment();
+  }
+
+  /**
+   * Generates a lightweight procedural studio softbox environment map via PMREMGenerator
+   * so satin titanium and anodized aluminum STL meshes display crisp PBR reflections.
+   * @private
+   */
+  _initStudioEnvironment() {
+    this._envRenderTarget = null;
+    if (!this.renderer || !this.scene || typeof THREE.PMREMGenerator !== 'function') return;
+
+    try {
+      const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+      if (typeof pmremGenerator.compileCubemapShader === 'function') {
+        pmremGenerator.compileCubemapShader();
+      }
+
+      const envScene = new THREE.Scene();
+      envScene.background = new THREE.Color(0x111317);
+
+      // Overhead diffused studio softbox (Warm Titanium White)
+      const topSoftboxGeo = new THREE.PlaneGeometry(900, 900);
+      const topSoftboxMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, side: THREE.DoubleSide });
+      const topSoftbox = new THREE.Mesh(topSoftboxGeo, topSoftboxMat);
+      topSoftbox.position.set(0, 520, 0);
+      topSoftbox.rotation.x = Math.PI / 2;
+      envScene.add(topSoftbox);
+
+      // Key lateral reflector panel (Soft Neutral Titanium)
+      const keyPanelGeo = new THREE.PlaneGeometry(650, 420);
+      const keyPanelMat = new THREE.MeshBasicMaterial({ color: 0xcbd5e1, side: THREE.DoubleSide });
+      const keyPanel = new THREE.Mesh(keyPanelGeo, keyPanelMat);
+      keyPanel.position.set(480, 220, 320);
+      keyPanel.lookAt(0, 140, 0);
+      envScene.add(keyPanel);
+
+      // Fill lateral reflector panel (Calibrated Slate)
+      const fillPanelGeo = new THREE.PlaneGeometry(600, 380);
+      const fillPanelMat = new THREE.MeshBasicMaterial({ color: 0x64748b, side: THREE.DoubleSide });
+      const fillPanel = new THREE.Mesh(fillPanelGeo, fillPanelMat);
+      fillPanel.position.set(-460, 180, -280);
+      fillPanel.lookAt(0, 140, 0);
+      envScene.add(fillPanel);
+
+      // Cool titanium-slate backlight strip for crisp machined bevel definition
+      const rimStripGeo = new THREE.PlaneGeometry(800, 120);
+      const rimStripMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
+      const rimStrip = new THREE.Mesh(rimStripGeo, rimStripMat);
+      rimStrip.position.set(-220, 340, -520);
+      rimStrip.lookAt(0, 150, 0);
+      envScene.add(rimStrip);
+
+      this._envRenderTarget = pmremGenerator.fromScene(envScene, 0.04);
+      if (this._envRenderTarget && this._envRenderTarget.texture) {
+        this.scene.environment = this._envRenderTarget.texture;
+      }
+
+      // Clean up temporary procedural geometries and materials
+      envScene.traverse((child) => {
+        if (child.geometry && typeof child.geometry.dispose === 'function') child.geometry.dispose();
+        if (child.material && typeof child.material.dispose === 'function') child.material.dispose();
+      });
+      pmremGenerator.dispose();
+    } catch (_) {
+      // Gracefully ignore in headless/mocked test environments without WebGL context
+    }
   }
 
   _initLights() {
     // 1. Ambient baseline
-    const ambientLight = new THREE.AmbientLight(0x272b35, 1.2);
+    const ambientLight = new THREE.AmbientLight(0x272b35, 1.15);
     this.scene.add(ambientLight);
 
-    // 2. Hemisphere ambient (Warm Slate / Neutral Titanium)
-    const hemiLight = new THREE.HemisphereLight(0x4b5563, 0x181a20, 0.8);
+    // 2. Hemisphere ambient (Cool Slate Sky / Warm Charcoal Ground)
+    const hemiLight = new THREE.HemisphereLight(0x64748b, 0x181a20, 0.9);
     this.scene.add(hemiLight);
 
-    // 3. Key directional light with soft shadows
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    // 3. Key directional light (Calibrated Studio White) with soft shadows
+    const keyLight = new THREE.DirectionalLight(0xf8fafc, 2.2);
     this.keyLight = keyLight;
     keyLight.position.set(300, 500, 300);
     keyLight.castShadow = this.options.shadows;
@@ -109,13 +177,13 @@ export class ThreeScene {
     keyLight.shadow.radius = 4;
     this.scene.add(keyLight);
 
-    // 4. Fill cyan directional light
-    const fillLight = new THREE.DirectionalLight(0x00d9e6, 1.0);
-    fillLight.position.set(-250, 200, -250);
+    // 4. Neutral Cool Slate fill directional light (zero neon cyan)
+    const fillLight = new THREE.DirectionalLight(0x64748b, 1.1);
+    fillLight.position.set(-250, 220, -250);
     this.scene.add(fillLight);
 
-    // 5. Cool top-back rim light separates the arm from the dark viewport.
-    const rimLight = new THREE.DirectionalLight(0x8bdcff, 0.9);
+    // 5. Crisp Titanium top-back rim light separates the arm from the dark void
+    const rimLight = new THREE.DirectionalLight(0xe2e8f0, 1.0);
     rimLight.position.set(-180, 460, -420);
     this.scene.add(rimLight);
   }
@@ -307,6 +375,10 @@ export class ThreeScene {
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.onResize);
+    }
+    if (this._envRenderTarget && typeof this._envRenderTarget.dispose === 'function') {
+      this._envRenderTarget.dispose();
+      this._envRenderTarget = null;
     }
     if (this.controls) this.controls.dispose();
     if (this.renderer) {

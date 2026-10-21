@@ -155,6 +155,23 @@ export class RobotVisualizer3D {
     this.threeScene.requestRender();
   }
 
+  setLiveVisible(visible) {
+    this.robotModel.setLiveVisible(visible);
+    this.threeScene.requestRender();
+  }
+
+  /**
+   * Highlights a specific joint link (J1-J6) in the 3D viewport when its 2D card is hovered
+   * @param {'j1'|'j2'|'j3'|'j4'|'j5'|'j6'|number|null} jointKeyOrIndex
+   */
+  setHighlightedJoint(jointKeyOrIndex) {
+    if (this.robotModel && typeof this.robotModel.setHighlightedJoint === 'function') {
+      if (this.robotModel.setHighlightedJoint(jointKeyOrIndex)) {
+        this.threeScene.requestRender();
+      }
+    }
+  }
+
   setFloorAlertVisible(visible) {
     this.workspaceVisualizer.setFloorAlertVisible(visible);
     this.threeScene.requestRender();

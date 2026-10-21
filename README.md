@@ -1,3 +1,5 @@
+<p align="center"><strong>English</strong> · <a href="README.pl.md" lang="pl">Polski</a></p>
+
 <p align="center">
   <img src="docs/assets/stppe-banner.png" alt="STPPE Reborn — six-axis robot arm and mechanical CAD details" width="100%">
 </p>

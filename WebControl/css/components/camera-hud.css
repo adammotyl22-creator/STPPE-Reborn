@@ -1,6 +1,6 @@
 /* ============================================================================
    CAMERA-HUD.CSS - Eye-in-Hand J5 USB Vision PIP HUD & Dock Tab Styling
-   Cyberpunk Dark Slate / Metallic Industrial Aesthetic (Zero Neon)
+   Soft Neutral Precision Industrial Aesthetic (Zero Neon)
    ============================================================================ */
 
 /* Floating Picture-in-Picture (PIP) HUD Overlay inside 3D Viewport */
@@ -10,11 +10,10 @@
   right: 16px;
   width: 360px;
   max-width: calc(100% - 32px);
-  background: rgba(15, 23, 42, 0.94);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-metallic, #334155);
-  border-radius: var(--radius-sm, 6px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: rgba(20, 22, 27, 0.96);
+  border: 1px solid var(--border-metallic, #262a33);
+  border-radius: var(--radius-sm, 3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), var(--bevel-highlight);
   z-index: 120;
   display: flex;
   flex-direction: column;
@@ -24,7 +23,7 @@
 }
 
 .camera-hud-overlay:hover {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: rgba(226, 232, 240, 0.35);
 }
 
 /* Docked state: firmly parked in bottom-right corner */
@@ -49,24 +48,23 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 5px 10px;
+  background: rgba(17, 19, 23, 0.94);
+  border: 1px solid var(--border-metallic);
+  border-radius: 2px;
   color: var(--text-primary, #f8fafc);
-  font-size: 11px;
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
   z-index: 120;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   transition: all var(--transition-fast);
 }
 
 .camera-pip-min-badge:hover {
-  background: rgba(15, 23, 42, 0.85);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .camera-pip-min-badge.hidden {
@@ -79,8 +77,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: rgba(30, 41, 59, 0.96);
-  border-bottom: 1px solid var(--border-metallic, #334155);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-metallic, #262a33);
   cursor: grab;
 }
 
@@ -96,12 +94,12 @@
 
 .camera-hud-icon {
   font-size: 13px;
-  color: #38bdf8;
+  color: var(--accent-amber, #d97706);
 }
 
 .camera-hud-title {
-  font-family: var(--font-sans, system-ui);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--text-primary, #f8fafc);
   text-transform: uppercase;
@@ -121,7 +119,7 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted, #94a3b8);
-  border-radius: 3px;
+  border-radius: 2px;
   padding: 2px 6px;
   font-size: 11px;
   cursor: pointer;
@@ -134,9 +132,9 @@
 }
 
 .hud-control-btn:hover {
-  background: var(--bg-hover, #334155);
+  background: var(--bg-hover);
   color: var(--text-primary, #f8fafc);
-  border-color: var(--border-metallic, #475569);
+  border-color: var(--border-metallic);
 }
 
 /* Canvas Display Area */
@@ -144,7 +142,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #020617;
+  background: var(--bg-inset, #0d0f12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -163,8 +161,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px;
-  background: rgba(15, 23, 42, 0.98);
-  border-top: 1px solid var(--border-subtle, #1e293b);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle, #1c1f26);
   gap: 6px;
 }
 
@@ -175,11 +173,11 @@
 }
 
 .btn-cam-action {
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-metallic, #334155);
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
   color: var(--text-secondary, #cbd5e1);
   padding: 3px 8px;
-  border-radius: 3px;
+  border-radius: 2px;
   font-family: var(--font-mono, monospace);
   font-size: 10px;
   font-weight: 500;
@@ -191,33 +189,33 @@
 }
 
 .btn-cam-action:hover {
-  background: var(--bg-hover, #334155);
-  border-color: #475569;
+  background: var(--bg-hover);
+  border-color: rgba(255, 255, 255, 0.22);
   color: #f8fafc;
 }
 
 .btn-cam-action.btn-active {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: rgba(217, 119, 6, 0.16);
+  border-color: var(--accent-amber, #d97706);
+  color: #fbbf24;
 }
 
 /* Full Dock Tab: Vision & Inspection Studio */
 .vision-dock-layout {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
-  padding: 10px 14px;
+  padding: 6px 10px;
   box-sizing: border-box;
 }
 
 .vision-main-viewport {
   display: flex;
   flex-direction: column;
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-metallic, #334155);
-  border-radius: var(--radius-xs, 4px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs, 2px);
   overflow: hidden;
 }
 
@@ -226,8 +224,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: rgba(15, 23, 42, 0.85);
-  border-bottom: 1px solid var(--border-subtle, #1e293b);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .vision-canvas-container {
@@ -256,9 +254,9 @@
 }
 
 .vision-card-section {
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-metallic, #334155);
-  border-radius: var(--radius-xs, 4px);
+  background: var(--bg-card);
+  border: 1px solid var(--border-metallic);
+  border-radius: var(--radius-xs, 2px);
   padding: 8px 10px;
 }
 
@@ -294,13 +292,13 @@
 }
 
 .vision-select {
-  background: var(--bg-inset, #0f172a);
-  border: 1px solid var(--border-metallic, #334155);
+  background: var(--bg-inset, #0d0f12);
+  border: 1px solid var(--border-metallic);
   color: var(--text-primary, #f8fafc);
   font-family: var(--font-mono, monospace);
   font-size: 10.5px;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 2px;
   outline: none;
 }
 
@@ -314,8 +312,8 @@
 
 .snap-thumb-card {
   position: relative;
-  border: 1px solid var(--border-subtle, #334155);
-  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
   overflow: hidden;
   background: #000;
   aspect-ratio: 16 / 9;
@@ -333,7 +331,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(17, 19, 23, 0.90);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -344,7 +342,7 @@
 }
 
 .btn-snap-dl {
-  color: #38bdf8;
+  color: var(--text-primary);
   text-decoration: none;
   font-size: 9px;
 }

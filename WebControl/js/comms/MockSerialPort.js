@@ -1,7 +1,7 @@
 /**
  * MockSerialPort.js - In-Browser Virtual Teensy 4.1 Hardware Simulator
  * 
- * Simulates Teensy 4.1 firmware v3.1.0 (IK_Control.ino):
+ * Simulates Teensy 4.1 firmware v3.3.0 (IK_Control.ino):
  * - Streams 10Hz JSON telemetry (`JTELEM`) matching exact firmware schema
  * - Executes quintic spline physics for smooth trajectory simulation
  * - Evaluates CRC-8 Maxim packets and responds to all ASCII text commands
@@ -15,7 +15,11 @@ import {
   L2,
   L3,
   JOINT_LIMITS,
-  forwardKinematics
+  forwardKinematics6DOF,
+  solveIK6DOF,
+  eulerToQuat,
+  quatSlerp,
+  quatToEuler
 } from '../kinematics/RobotKinematics.js';
 
 /**
@@ -31,7 +35,7 @@ export class MockSerialPort {
   constructor(options = {}) {
     this.options = {
       telemIntervalMs: 100, // 10Hz
-      initialPose: { j1: 0.0, j2: -90.0, j3: 90.0, j4: 90.0, j5: 0.0, j6: 0.0, grip: 0.0 },
+      initialPose: { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 0.0, j6: 0.0, grip: 0.0 },
       ...options
     };
 
@@ -57,6 +61,8 @@ export class MockSerialPort {
 
     this.workOffset = { x: 0, y: 0, z: 0 };
     this.toolOffset = { x: 0, y: 0, z: 0 };
+    this.opMode = 'AUTO';
+    this.tcpCalPoses = new Set();
 
     // Motion interpolation state
     this.isMoving = false;
@@ -64,6 +70,7 @@ export class MockSerialPort {
     this.moveDuration = 1000;
     this.startPose = { j1: this.j1, j2: this.j2, j3: this.j3, j4: this.j4, j5: this.j5, j6: this.j6 };
     this.targetPose = { j1: this.j1, j2: this.j2, j3: this.j3, j4: this.j4, j5: this.j5, j6: this.j6 };
+    this.linearPath = null;
 
     // Stream & callback listeners
     this.rxListeners = new Set();
@@ -239,7 +246,41 @@ export class MockSerialPort {
     }
 
     if (upper === 'VER') {
-      this.emitOutput('VER v3.1.0 2026-09-01 15:44\n');
+      this.emitOutput('VER v3.3.0 MOCK MOCK\n');
+      return;
+    }
+
+    if (upper === 'MODE T1' || upper === 'MODE AUTO') {
+      this.opMode = upper.slice(5);
+      this.emitOutput(`MODE: ${this.opMode}\nOK\n`);
+      return;
+    }
+
+    const offsetCommand = upper.match(/^(TOOL|WORK)([XYZ])\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:E[+-]?\d+)?)$/);
+    if (offsetCommand) {
+      const offset = offsetCommand[1] === 'TOOL' ? this.toolOffset : this.workOffset;
+      offset[offsetCommand[2].toLowerCase()] = Number(offsetCommand[3]);
+      this.emitOutput('OK\n');
+      return;
+    }
+
+    if (upper === 'TCPCAL CLEAR') {
+      this.tcpCalPoses.clear();
+      this.emitOutput('TCPCAL: Cleared all captured poses\nOK\n');
+      return;
+    }
+    if (/^TCPCAL [1-4]$/.test(upper)) {
+      const pose = Number(upper.slice(-1));
+      this.tcpCalPoses.add(pose);
+      this.emitOutput(`TCPCAL: Pose ${pose} captured\nOK\n`);
+      return;
+    }
+    if (upper === 'TCPCAL SOLVE') {
+      if (this.tcpCalPoses.size !== 4) {
+        this.emitOutput('TCPCAL: Capture all 4 poses first\n');
+      } else {
+        this.emitOutput(`TCPCAL: TCP X=${this.toolOffset.x.toFixed(3)} Y=${this.toolOffset.y.toFixed(3)} Z=${this.toolOffset.z.toFixed(3)} mm, RMS=0.000 mm (EEPROM save scheduled)\n`);
+      }
       return;
     }
 
@@ -255,7 +296,7 @@ export class MockSerialPort {
 
     if (upper === 'STOP') {
       this.isMoving = false;
-      this.emitOutput('Motion stopped (queue cleared)\nOK\n');
+      this.emitOutput('STOP: Category 1 controlled deceleration...\nOK\n');
       return;
     }
 
@@ -471,6 +512,9 @@ export class MockSerialPort {
     const j5Match = cmd.match(/J5([-\d.]+)/);
     const j6Match = cmd.match(/J6([-\d.]+)/);
     const durMatch = cmd.match(/D(\d+)/);
+    const rollMatch = cmd.match(/(?:^|\s)R([-\d.]+)/);
+    const pitchMatch = cmd.match(/(?:^|\s)P([-\d.]+)/);
+    const yawMatch = cmd.match(/(?:^|\s)YW([-\d.]+)/);
 
     const x = xMatch ? parseFloat(xMatch[1]) : 0;
     const y = yMatch ? parseFloat(yMatch[1]) : 0;
@@ -491,6 +535,33 @@ export class MockSerialPort {
     const dur = durMatch ? parseInt(durMatch[1], 10) : (isLinear ? 2000 : 1000);
 
     this.emitOutput(`${isLinear ? 'MOVL' : 'MOV'}: Target X=${x} Y=${y} Z=${z} D=${dur}\n`);
+
+    if (rollMatch && pitchMatch && yawMatch) {
+      const roll = Number(rollMatch[1]);
+      const pitch = Number(pitchMatch[1]);
+      const yaw = Number(yawMatch[1]);
+      const currentAngles = { j1: this.j1, j2: this.j2, j3: this.j3, j4: this.j4, j5: this.j5, j6: this.j6 };
+      const ik = solveIK6DOF(x, y, z, roll, pitch, yaw, {
+        currentAngles, toolOffset: this.toolOffset, workOffset: this.workOffset
+      });
+      if (!ik.success || ik.clamped) {
+        this.emitOutput('ERR: MOVL target unreachable\n');
+        return;
+      }
+      const start = forwardKinematics6DOF(this.j1, this.j2, this.j3, this.j4, this.j5, this.j6, {
+        toolOffset: this.toolOffset, workOffset: this.workOffset
+      });
+      this._startMove(ik.angles, dur);
+      if (isLinear) {
+        this.linearPath = {
+          start: start.tcp, end: { x, y, z },
+          q0: eulerToQuat(start.roll, start.pitch, start.yaw),
+          q1: eulerToQuat(roll, pitch, yaw)
+        };
+      }
+      this.emitOutput('OK\n');
+      return;
+    }
 
     // Approximate target joint angle motion for simulation
     const targetJ1 = Math.atan2(y, x) * (180 / Math.PI);
@@ -516,17 +587,21 @@ export class MockSerialPort {
 
     this._startMove({
       j1: 0.0,
-      j2: -90.0,
-      j3: 90.0,
-      j4: 90.0,
-      j5: 90.0
+      j2: 0.0,
+      j3: 0.0,
+      j4: 0.0,
+      j5: 0.0,
+      j6: 0.0
     }, 1500);
 
     setTimeout(() => {
       this.homingActive = false;
       this.j1 = 0.0;
-      this.j2 = -90.0;
-      this.j3 = 90.0;
+      this.j2 = 0.0;
+      this.j3 = 0.0;
+      this.j4 = 0.0;
+      this.j5 = 0.0;
+      this.j6 = 0.0;
       this.emitOutput('HOMING: Complete\nOK\n');
     }, 1500);
   }
@@ -562,6 +637,7 @@ export class MockSerialPort {
    * @private
    */
   _startMove(target, durationMs) {
+    this.linearPath = null;
     this.startPose = { j1: this.j1, j2: this.j2, j3: this.j3, j4: this.j4, j5: this.j5, j6: this.j6 };
     this.targetPose = { ...this.startPose, ...target };
     this.moveStartTime = Date.now();
@@ -578,6 +654,29 @@ export class MockSerialPort {
 
     const elapsed = Date.now() - this.moveStartTime;
     const t = elapsed / this.moveDuration;
+
+    if (this.linearPath) {
+      const u = Math.max(0, Math.min(1, t));
+      const { start, end, q0, q1 } = this.linearPath;
+      const orient = quatToEuler(quatSlerp(q0, q1, u));
+      const ik = solveIK6DOF(
+        start.x + (end.x - start.x) * u,
+        start.y + (end.y - start.y) * u,
+        start.z + (end.z - start.z) * u,
+        orient.roll, orient.pitch, orient.yaw,
+        { currentAngles: { j1: this.j1, j2: this.j2, j3: this.j3, j4: this.j4, j5: this.j5, j6: this.j6 },
+          toolOffset: this.toolOffset, workOffset: this.workOffset }
+      );
+      if (ik.success && !ik.clamped) {
+        for (const joint of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) this[joint] = ik[joint];
+      }
+      if (t >= 1.0) {
+        this.isMoving = false;
+        this.linearPath = null;
+        for (const joint of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) this[joint] = this.targetPose[joint];
+      }
+      return;
+    }
 
     this.j1 = quinticInterpolate(this.startPose.j1, this.targetPose.j1, t);
     this.j2 = quinticInterpolate(this.startPose.j2, this.targetPose.j2, t);
@@ -602,7 +701,7 @@ export class MockSerialPort {
    * @private
    */
   _emitSingleJsonTelemetry() {
-    const fk = forwardKinematics(this.j1, this.j2, this.j3, this.workOffset, this.toolOffset, this.j4, this.j5, this.j6);
+    const fk = forwardKinematics6DOF(this.j1, this.j2, this.j3, this.j4, this.j5, this.j6, { workOffset: this.workOffset, toolOffset: this.toolOffset });
     const tcpX = fk.tcp ? fk.tcp.x : (fk.x ?? 0);
     const tcpY = fk.tcp ? fk.tcp.y : (fk.y ?? 0);
     const tcpZ = fk.tcp ? fk.tcp.z : (fk.z ?? 0);
@@ -631,7 +730,7 @@ export class MockSerialPort {
    * @private
    */
   _emitSingleAr4Telemetry() {
-    const fk = forwardKinematics(this.j1, this.j2, this.j3, this.workOffset, this.toolOffset, this.j4, this.j5, this.j6);
+    const fk = forwardKinematics6DOF(this.j1, this.j2, this.j3, this.j4, this.j5, this.j6, { workOffset: this.workOffset, toolOffset: this.toolOffset });
     const tcpX = fk.tcp ? fk.tcp.x : (fk.x ?? 0);
     const tcpY = fk.tcp ? fk.tcp.y : (fk.y ?? 0);
     const tcpZ = fk.tcp ? fk.tcp.z : (fk.z ?? 0);

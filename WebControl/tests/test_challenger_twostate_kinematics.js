@@ -529,7 +529,7 @@ async function runQuickPresetsTests() {
     },
     stow: {
       name: 'Stow',
-      joints: { j1: 0.0, j2: -65.0, j3: 160.0, j4: 0.0, j5: -85.0, j6: 0.0, grip: 0.0 }
+      joints: { j1: 0.0, j2: -60.0, j3: 160.0, j4: 0.0, j5: -85.0, j6: 0.0, grip: 0.0 }
     }
   };
 

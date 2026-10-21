@@ -1,5 +1,7 @@
 # STPPE Reborn — Complete System Specification & Architecture
 
+**English** · [Polski](STPPE_SYSTEM_SPECIFICATION.pl.md)
+
 > **System Teleoperacyjny do Precyzyjnych Prac Elektronicznych**  
 > *Teleoperation System for High-Precision Electronics Servicing & Micro-Assembly*
 
@@ -46,7 +48,7 @@
 | **J2** | Shoulder Pitch | $-65.0^\circ$ | $+115.0^\circ$ | **20:1** high-reduction stage |
 | **J3** | Elbow Pitch | $-35.0^\circ$ | $+170.0^\circ$ | **20:1** high-reduction stage |
 | **J4** | Forearm Roll | $-90.0^\circ$ | $+90.0^\circ$ | Direct / reduction wrist drive |
-| **J5** | Wrist Pitch | $-90.0^\circ$ | $+90.0^\circ$ | Direct / reduction wrist drive |
+| **J5** | Wrist Pitch | $-120.0^\circ$ | $+120.0^\circ$ | Direct / reduction wrist drive |
 | **J6** | Tool Roll | $-180.0^\circ$ | $+180.0^\circ$ | Direct / reduction wrist drive |
 
 ### 2.4 Safety Envelopes

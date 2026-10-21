@@ -372,7 +372,7 @@ async function runKinematicsStressTests() {
     assert(outReach.warnings.includes('OUT_OF_REACH_MAXIMUM_EXTENSION'), 'Extreme target flags OUT_OF_REACH_MAXIMUM_EXTENSION');
 
     // 2.3.5 Joint pitch limit clamping defect test
-    const tiltIk = solveIK(150, 0, 160, { wristMode: WristMode.MANUAL, j5Param: 120 });
+    const tiltIk = solveIK(150, 0, 160, { wristMode: WristMode.MANUAL, j5Param: 150 });
     const isJ5Flagged = tiltIk.warnings.includes('J5_LIMIT_EXCEEDED') || tiltIk.clamped === true;
     assert(isJ5Flagged, 'solveIK flags J5 limit violation when pitch exceeds joint limits');
   }
@@ -402,7 +402,7 @@ async function runKinematicsStressTests() {
       }
     }
 
-    // PROJECT.md requirement line 60: Euclidean error < 0.1 mm
+    // Manual-mode IK/FK round-trip tolerance: Euclidean error < 0.1 mm.
     assert(maxM6Error < 0.1, `Mode 6 manual decoupling holds < 0.1 mm error across all pitch angles [30-150 deg] (worst at ${worstAngle} deg: ${maxM6Error.toFixed(6)} mm)`);
   }
 }

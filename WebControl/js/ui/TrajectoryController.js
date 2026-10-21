@@ -8,7 +8,8 @@
 
 import { appState as defaultAppState } from '../state/AppState.js';
 import { presetManager as defaultPresetManager, PresetManager } from '../state/PresetManager.js';
-import { buildFramedPacket, buildTeachCommand, buildGripCommand, buildStopCommand } from '../comms/PacketBuilder.js';
+import { buildFramedPacket, buildMovOrientationCommand, buildTeachCommand, buildGripCommand, buildStopCommand } from '../comms/PacketBuilder.js';
+import { forwardKinematics6DOF } from '../kinematics/RobotKinematics.js';
 
 export const PlaybackState = Object.freeze({
   IDLE: 'IDLE',
@@ -156,6 +157,54 @@ export class TrajectoryController {
     return this.appState.getState('sequence') || { sequenceName: 'Sequence', loop: this.loop, waypoints: [] };
   }
 
+  _orientationControls() {
+    if (typeof document === 'undefined') return {};
+    const number = (id) => {
+      const input = document.getElementById(id);
+      return input && input.value.trim() !== '' && Number.isFinite(Number(input.value))
+        ? Number(input.value) : undefined;
+    };
+    const wristButton = document.getElementById('btn_orient_mode_wrist');
+    const activeFrame = document.querySelector('[data-coord-frame].active');
+    const selectedFrame = document.getElementById('select_coord_frame')?.value;
+    const frame = activeFrame?.dataset.coordFrame || selectedFrame;
+    const w = number('select_wrist_mode');
+    return {
+      roll: number('input_roll'), pitch: number('input_pitch'), yaw: number('input_yaw'),
+      orientationMode: wristButton?.classList.contains('active') ? 'wrist' : '6dof',
+      ...(w >= 0 && w <= 6 ? { w } : {}),
+      frame: ['world', 'base', 'tool'].includes(frame) ? frame : 'base',
+      x: number('input_x'), y: number('input_y'), z: number('input_z')
+    };
+  }
+
+  _completeWaypoint(source, sanitized, controls = null) {
+    const wp = { ...sanitized };
+    const joints = ['j1', 'j2', 'j3', 'j4', 'j5', 'j6'];
+    const hasJoints = joints.every(key => source[key] !== undefined && source[key] !== null && Number.isFinite(Number(source[key])));
+    const fk = hasJoints ? forwardKinematics6DOF(...joints.map(key => Number(source[key]))) : null;
+    for (const axis of ['x', 'y', 'z']) {
+      const value = source[axis] ?? controls?.[axis];
+      if (value !== undefined && value !== null && Number.isFinite(Number(value))) wp[axis] = Number(value);
+      else if (fk) wp[axis] = fk.tcp[axis];
+    }
+    const explicit = ['roll', 'pitch', 'yaw'].every(key =>
+      source[key] !== undefined && source[key] !== null && Number.isFinite(Number(source[key])));
+    const controlEuler = controls && ['roll', 'pitch', 'yaw'].every(key => Number.isFinite(controls[key]));
+    if (explicit || controlEuler || fk) {
+      for (const key of ['roll', 'pitch', 'yaw']) {
+        wp[key] = explicit ? Number(source[key]) : controlEuler ? controls[key] : fk[key];
+      }
+    }
+    const w = source.w ?? controls?.w;
+    if (w !== undefined && w !== null && Number.isInteger(Number(w)) && Number(w) >= 0 && Number(w) <= 6) wp.w = Number(w);
+    const mode = source.orientationMode ?? controls?.orientationMode ?? (wp.w !== undefined ? 'wrist' : '6dof');
+    wp.orientationMode = mode === 'wrist' || mode === 'preset' ? 'wrist' : '6dof';
+    const frame = source.frame ?? controls?.frame;
+    wp.frame = ['world', 'base', 'tool'].includes(frame) ? frame : 'base';
+    return wp;
+  }
+
   /**
    * Sets entire sequence dataset
    * @param {Object} seq
@@ -167,6 +216,8 @@ export class TrajectoryController {
       throw new Error(`Invalid sequence: ${valResult.errors.join('; ')}`);
     }
     this.loop = valResult.sequence.loop;
+    valResult.sequence.waypoints = valResult.sequence.waypoints.map((wp, index) =>
+      this._completeWaypoint(seq.waypoints[index], wp));
     this.appState.setSequence(valResult.sequence);
     this.currentIndex = 0;
     this.selectedWaypointId = valResult.sequence.waypoints.length > 0 ? valResult.sequence.waypoints[0].id : null;
@@ -184,13 +235,14 @@ export class TrajectoryController {
     const seq = this.getSequence();
     const newIndex = atIndex >= 0 ? atIndex : seq.waypoints.length;
     const valResult = PresetManager.validateWaypoint(wpData, newIndex);
-
-    const wp = valResult.waypoint;
+    if (!valResult.valid) throw new Error(`Invalid waypoint: ${valResult.errors.join('; ')}`);
+    const wp = this._completeWaypoint(wpData, valResult.waypoint, this._orientationControls());
     if (atIndex >= 0 && atIndex < seq.waypoints.length) {
       seq.waypoints.splice(atIndex, 0, wp);
       this.appState.setSequence(seq);
     } else {
-      this.appState.addWaypoint(wp);
+      seq.waypoints.push(wp);
+      this.appState.setSequence(seq);
     }
 
     this.selectedWaypointId = wp.id;
@@ -219,7 +271,10 @@ export class TrajectoryController {
 
     const merged = { ...targetWp, ...updates };
     const valResult = PresetManager.validateWaypoint(merged, 0);
-    const updated = this.appState.updateWaypoint(targetWp.id, valResult.waypoint);
+    if (!valResult.valid) throw new Error(`Invalid waypoint: ${valResult.errors.join('; ')}`);
+    const captureControls = ['x', 'y', 'z', 'roll', 'pitch', 'yaw', 'w', 'orientationMode', 'frame'].some(key => key in updates);
+    const waypoint = this._completeWaypoint(merged, valResult.waypoint, captureControls ? this._orientationControls() : null);
+    const updated = this.appState.updateWaypoint(targetWp.id, waypoint);
     this._updateDomUI();
     return updated;
   }
@@ -376,6 +431,7 @@ export class TrajectoryController {
       j3: Number(live.j3 ?? 90.0),
       j4: Number(live.j4 ?? 90.0),
       j5: Number(live.j5 ?? 90.0),
+      j6: Number(live.j6 ?? 0.0),
       dx: Number(live.dx ?? 0),
       dy: Number(live.dy ?? 0),
       dur: 1500,
@@ -412,6 +468,7 @@ export class TrajectoryController {
       j3: Number(ghost.j3 ?? 90.0),
       j4: Number(ghost.j4 ?? 90.0),
       j5: Number(ghost.j5 ?? 90.0),
+      j6: Number(ghost.j6 ?? 0.0),
       dx: 0,
       dy: 0,
       dur: Number(ghost.duration || 1500),
@@ -454,6 +511,10 @@ export class TrajectoryController {
         j3: wp.j3,
         j4: wp.j4,
         j5: wp.j5,
+        j6: wp.j6,
+        x: wp.x, y: wp.y, z: wp.z,
+        roll: wp.roll, pitch: wp.pitch, yaw: wp.yaw,
+        orientationMode: wp.orientationMode, w: wp.w, frame: wp.frame,
         grip: wp.grip,
         duration: wp.dur
       });
@@ -615,15 +676,16 @@ export class TrajectoryController {
     const wp = seq.waypoints[this.currentIndex];
 
     if (!this.serialManager || !this.serialManager.isConnected()) {
-      // Offline preview: re-interpolate from current telemetry pose
+      // Offline preview: resume from the current ghost pose.
       if (wp) {
-        const currentTelem = this.appState.getState('livePose') || this.appState.getState('telemetry') || {};
+        const currentTelem = this.appState.getState('ghostPose') || {};
         const startPose = {
           j1: Number(currentTelem.j1 ?? 0),
           j2: Number(currentTelem.j2 ?? -90),
           j3: Number(currentTelem.j3 ?? 90),
           j4: Number(currentTelem.j4 ?? 90),
           j5: Number(currentTelem.j5 ?? 90),
+          j6: Number(currentTelem.j6 ?? 0),
           grip: Number(currentTelem.grip ?? 0)
         };
         const targetPose = {
@@ -632,9 +694,10 @@ export class TrajectoryController {
           j3: Number(wp.j3 ?? 90),
           j4: Number(wp.j4 ?? 90),
           j5: Number(wp.j5 ?? 90),
+          j6: Number(wp.j6 ?? 0),
           grip: Number(wp.grip ?? 0)
         };
-        this._startLiveInterpolation(startPose, targetPose, resumeDelay);
+        this._startGhostInterpolation(startPose, targetPose, resumeDelay);
       }
     } else {
       // Hardware connected: re-dispatch current waypoint to resync firmware pose
@@ -906,6 +969,10 @@ export class TrajectoryController {
       const futureWp = waypoints[lookIdx];
       if (!futureWp) break;
 
+      // Do not prefill joint-spline lookahead across a Cartesian linear (MOVL) move
+      const futureMoveType = String(futureWp.moveType || futureWp.motionType || '').toLowerCase();
+      if (futureMoveType === 'movl') break;
+
       const futureDur = Math.max(10, Math.round(futureWp.dur / this.speedScale));
       const futureDwell = (futureWp.grip !== undefined) ? Math.max(0, this.gripperDwellMs) : 0;
       const dispatchDelay = accumulatedDelay;
@@ -953,7 +1020,7 @@ export class TrajectoryController {
   }
 
   /**
-   * Dispatches framed CRC packet and gripper command for active waypoint
+   * Dispatches framed CRC packet (or MOVL linear command) and gripper command for active waypoint
    * @private
    */
   _dispatchCurrentWaypoint() {
@@ -962,17 +1029,38 @@ export class TrajectoryController {
     if (!wp) return;
 
     const scaledDur = Math.max(1, Math.round(wp.dur / this.speedScale));
-    const packet = buildFramedPacket({
-      j1: wp.j1,
-      j2: wp.j2,
-      j3: wp.j3,
-      j4: wp.j4,
-      j5: wp.j5,
-      j6: wp.j6 ?? 0,
-      dx: wp.dx,
-      dy: wp.dy,
-      dur: scaledDur
-    });
+    const isMovl = String(wp.moveType || wp.motionType || '').toLowerCase() === 'movl';
+
+    let packet;
+    if (isMovl) {
+      const fk = forwardKinematics6DOF(
+        wp.j1 ?? 0,
+        wp.j2 ?? 0,
+        wp.j3 ?? 0,
+        wp.j4 ?? 0,
+        wp.j5 ?? 0,
+        wp.j6 ?? 0
+      );
+      const tx = Number.isFinite(Number(wp.x)) ? Number(wp.x) : fk.tcp.x;
+      const ty = Number.isFinite(Number(wp.y)) ? Number(wp.y) : fk.tcp.y;
+      const tz = Number.isFinite(Number(wp.z)) ? Number(wp.z) : fk.tcp.z;
+      const tr = Number.isFinite(Number(wp.roll)) ? Number(wp.roll) : fk.roll;
+      const tp = Number.isFinite(Number(wp.pitch)) ? Number(wp.pitch) : fk.pitch;
+      const tyw = Number.isFinite(Number(wp.yaw)) ? Number(wp.yaw) : fk.yaw;
+      packet = buildMovOrientationCommand(tx, ty, tz, tr, tp, tyw, scaledDur, true).trim();
+    } else {
+      packet = buildFramedPacket({
+        j1: wp.j1,
+        j2: wp.j2,
+        j3: wp.j3,
+        j4: wp.j4,
+        j5: wp.j5,
+        j6: wp.j6 ?? 0,
+        dx: wp.dx,
+        dy: wp.dy,
+        dur: scaledDur
+      });
+    }
 
     // Send packet via WebSerial if connected (guard against double dispatch if already sent by lookahead)
     if (!this._dispatchedIndices.has(this.currentIndex)) {
@@ -1004,24 +1092,17 @@ export class TrajectoryController {
     };
     this.dispatchedPackets.push(record);
 
-    // Update Ghost Arm and Live Arm in 3D scene to visualize active position
+    // Preview the target on the ghost arm; live pose is reserved for hardware telemetry.
     if (this.appState) {
-      this.appState.updateGhostPose({
-        j1: wp.j1,
-        j2: wp.j2,
-        j3: wp.j3,
-        j4: wp.j4,
-        j5: wp.j5,
-        grip: wp.grip
-      });
       if (!this.serialManager || !this.serialManager.isConnected()) {
-        const currentTelem = this.appState.getState('livePose') || this.appState.getState('telemetry') || {};
+        const currentTelem = this.appState.getState('ghostPose') || {};
         const startPose = {
           j1: Number(currentTelem.j1 ?? 0),
           j2: Number(currentTelem.j2 ?? -90),
           j3: Number(currentTelem.j3 ?? 90),
           j4: Number(currentTelem.j4 ?? 90),
           j5: Number(currentTelem.j5 ?? 90),
+          j6: Number(currentTelem.j6 ?? 0),
           grip: Number(currentTelem.grip ?? 0)
         };
         const targetPose = {
@@ -1030,24 +1111,35 @@ export class TrajectoryController {
           j3: Number(wp.j3 ?? 90),
           j4: Number(wp.j4 ?? 90),
           j5: Number(wp.j5 ?? 90),
+          j6: Number(wp.j6 ?? 0),
           grip: Number(wp.grip ?? 0)
         };
-        this._startLiveInterpolation(startPose, targetPose, scaledDur);
+        this._startGhostInterpolation(startPose, targetPose, scaledDur);
+      } else {
+        this.appState.updateGhostPose({
+          j1: wp.j1,
+          j2: wp.j2,
+          j3: wp.j3,
+          j4: wp.j4,
+          j5: wp.j5,
+          j6: wp.j6 ?? 0,
+          grip: wp.grip
+        });
       }
       this.appState.setState('sequence.activeIndex', this.currentIndex);
     }
   }
 
   /**
-   * Smoothly interpolates live arm pose across waypoint duration (offline/preview playback)
+   * Smoothly interpolates ghost arm pose across waypoint duration (offline/preview playback)
    * @private
    */
-  _startLiveInterpolation(startPose, targetPose, durationMs) {
+  _startGhostInterpolation(startPose, targetPose, durationMs) {
     this._clearInterpolation();
 
     if (!durationMs || durationMs <= 20) {
       if (this.appState) {
-        this.appState.updateLiveTelemetry(targetPose);
+        this.appState.updateGhostPose(targetPose);
       }
       return;
     }
@@ -1071,11 +1163,12 @@ export class TrajectoryController {
         j3: startPose.j3 + (targetPose.j3 - startPose.j3) * s,
         j4: startPose.j4 + (targetPose.j4 - startPose.j4) * s,
         j5: startPose.j5 + (targetPose.j5 - startPose.j5) * s,
+        j6: startPose.j6 + (targetPose.j6 - startPose.j6) * s,
         grip: startPose.grip + (targetPose.grip - startPose.grip) * s
       };
 
       if (this.appState) {
-        this.appState.updateLiveTelemetry(interpolated);
+        this.appState.updateGhostPose(interpolated);
       }
 
       if (progress < 1.0 && (this.playerState === PlaybackState.PLAYING || this._isStepping)) {
@@ -1098,7 +1191,7 @@ export class TrajectoryController {
   }
 
   /**
-   * Clears active live pose animation interpolation
+   * Clears active ghost pose animation interpolation
    * @private
    */
   _clearInterpolation() {
@@ -1377,7 +1470,18 @@ export class TrajectoryController {
    * @returns {string}
    */
   exportJSON(pretty = true) {
-    return this.presetManager.exportSequenceJSON(this.getSequence(), pretty);
+    const seq = this.getSequence();
+    const validated = PresetManager.validateSequence(seq);
+    if (!validated.valid) throw new Error(`Export failed validation: ${validated.errors.join('; ')}`);
+    const exported = {
+      sequenceName: validated.sequence.sequenceName,
+      version: validated.sequence.version,
+      loop: validated.sequence.loop,
+      description: validated.sequence.description,
+      waypoints: validated.sequence.waypoints.map((wp, index) =>
+        this._completeWaypoint(seq.waypoints[index], wp))
+    };
+    return JSON.stringify(exported, null, pretty ? 2 : 0);
   }
 
   /**
@@ -1385,8 +1489,10 @@ export class TrajectoryController {
    * @param {string|Object} jsonStrOrObj
    */
   importJSON(jsonStrOrObj) {
-    const seq = this.presetManager.importSequenceJSON(jsonStrOrObj);
-    this.setSequence(seq);
+    // The preset manager validates the legacy schema but strips orientation fields.
+    const parsed = typeof jsonStrOrObj === 'string' ? JSON.parse(jsonStrOrObj) : jsonStrOrObj;
+    this.setSequence(parsed);
+    const seq = this.getSequence();
     if (this.appState) {
       this.appState.addConsoleLog({
         type: 'INFO',

@@ -60,15 +60,16 @@ export class RobotModel {
   constructor(options = {}) {
     this.options = Object.assign({
       showGhost: true,
+      showLive: true,
       shadows: true
     }, options);
 
     // Pose state: 6 joints (j1-j6) matching URDF kinematic assembly.
     // Public API still accepts (j1, j2, j3, j4, j5, grip) for backward compatibility.
-    this.livePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 90.0, j6: 0.0 };
-    this.targetLivePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 90.0, j6: 0.0 };
-    this.currentLivePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 90.0, j6: 0.0 };
-    this.ghostPose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 90.0, j6: 0.0 };
+    this.livePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 0.0, j6: 0.0 };
+    this.targetLivePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 0.0, j6: 0.0 };
+    this.currentLivePose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 0.0, j6: 0.0 };
+    this.ghostPose = { j1: 0.0, j2: 0.0, j3: 0.0, j4: 0.0, j5: 0.0, j6: 0.0 };
 
     this.root = new THREE.Group();
     this.root.name = 'robotModelRoot';
@@ -84,41 +85,69 @@ export class RobotModel {
     return Boolean(this.options.showGhost);
   }
 
+  get isLiveVisible() {
+    return Boolean(this.options.showLive);
+  }
+
   _initMaterials() {
     this.materials = {
-      // Live Arm: Satin Titanium / Slate Engineering PBR Palette
+      // Live Arm: Bead-Blasted Satin Titanium & Anodized Charcoal Aluminum PBR Palette
       metalBody: new THREE.MeshStandardMaterial({
-        color: 0x94a3b8, // Satin Slate
-        metalness: 0.40,
-        roughness: 0.35
+        color: 0x94a3b8, // Satin Titanium Slate
+        metalness: 0.58,
+        roughness: 0.28,
+        envMapIntensity: 1.1
       }),
       metalDark: new THREE.MeshStandardMaterial({
-        color: 0x334155, // Charcoal Titanium Accent
-        metalness: 0.50,
-        roughness: 0.30
+        color: 0x334155, // Anodized Charcoal Aluminum
+        metalness: 0.65,
+        roughness: 0.24,
+        envMapIntensity: 1.15
+      }),
+      metalHighlight: new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0, // Hovered Joint Bright Titanium Highlight
+        emissive: 0x334155,
+        emissiveIntensity: 0.35,
+        metalness: 0.65,
+        roughness: 0.20,
+        envMapIntensity: 1.25
       }),
 
-      // Ghost Target Arm: Industrial Holographic Amber Palette
+      // Ghost Target Arm: Calibrated Translucent Amber CAD Shader
       ghostBody: new THREE.MeshStandardMaterial({
         color: 0xd97706,
         emissive: 0x78350f,
-        emissiveIntensity: 0.25,
+        emissiveIntensity: 0.28,
         transparent: true,
-        opacity: 0.45,
-        metalness: 0.1,
-        roughness: 0.5,
+        opacity: 0.46,
+        metalness: 0.15,
+        roughness: 0.42,
         depthWrite: false,
         side: THREE.DoubleSide
       }),
       ghostAccent: new THREE.MeshStandardMaterial({
         color: 0xb45309,
         emissive: 0x451a03,
-        emissiveIntensity: 0.3,
+        emissiveIntensity: 0.32,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.56,
+        metalness: 0.20,
+        roughness: 0.38,
         depthWrite: false
+      }),
+      ghostHighlight: new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        emissive: 0xb45309,
+        emissiveIntensity: 0.45,
+        transparent: true,
+        opacity: 0.72,
+        metalness: 0.25,
+        roughness: 0.30,
+        depthWrite: false,
+        side: THREE.DoubleSide
       })
     };
+    this._highlightedJoint = null;
   }
 
   /**
@@ -159,6 +188,7 @@ export class RobotModel {
 
     // 1. Build Live Arm Assembly
     this.liveArm = this._buildArmAssembly(geometries, false);
+    this.liveArm.root.visible = this.options.showLive !== false;
     this.root.add(this.liveArm.root);
 
     // 2. Build Ghost Target Arm Assembly
@@ -347,6 +377,19 @@ export class RobotModel {
     tcpGroup.add(leftFinger);
     tcpGroup.add(rightFinger);
 
+    // Store default materials for 2D<->3D hover highlighting restoration
+    const links = {
+      j1: link1Mesh,
+      j2: link2Mesh,
+      j3: link3Mesh,
+      j4: link4Mesh,
+      j5: link5Mesh,
+      j6: link6Mesh
+    };
+    Object.values(links).forEach((mesh) => {
+      mesh.userData = Object.assign({}, mesh.userData, { defaultMaterial: mesh.material });
+    });
+
     return {
       root: armRoot,
       baseOffset,
@@ -357,10 +400,48 @@ export class RobotModel {
       j4: j4Group,
       j5: j5Group,
       j6: j6Group,
+      links,
       tcp: tcpGroup,
       leftFinger,
       rightFinger
     };
+  }
+
+  /**
+   * Highlights a specific joint link (J1-J6) in both Live and Ghost 3D assemblies
+   * when the operator hovers or focuses the corresponding 2D joint card.
+   * @param {'j1'|'j2'|'j3'|'j4'|'j5'|'j6'|number|null} jointKeyOrIndex
+   * @returns {boolean} true if highlight state changed
+   */
+  setHighlightedJoint(jointKeyOrIndex) {
+    let normalized = null;
+    if (typeof jointKeyOrIndex === 'number' && jointKeyOrIndex >= 1 && jointKeyOrIndex <= 6) {
+      normalized = `j${jointKeyOrIndex}`;
+    } else if (typeof jointKeyOrIndex === 'string') {
+      const clean = jointKeyOrIndex.trim().toLowerCase();
+      if (['j1', 'j2', 'j3', 'j4', 'j5', 'j6'].includes(clean)) {
+        normalized = clean;
+      }
+    }
+
+    if (this._highlightedJoint === normalized) return false;
+    this._highlightedJoint = normalized;
+
+    const applyToArm = (arm, highlightMat) => {
+      if (!arm || !arm.links) return;
+      for (const [key, mesh] of Object.entries(arm.links)) {
+        if (!mesh) continue;
+        if (key === normalized && highlightMat) {
+          mesh.material = highlightMat;
+        } else if (mesh.userData && mesh.userData.defaultMaterial) {
+          mesh.material = mesh.userData.defaultMaterial;
+        }
+      }
+    };
+
+    applyToArm(this.liveArm, this.materials.metalHighlight);
+    applyToArm(this.ghostArm, this.materials.ghostHighlight);
+    return true;
   }
 
   /**
@@ -389,15 +470,15 @@ export class RobotModel {
    * Apply joint angles to live robot arm.
    * Supports (j1, j2, j3, j4, j5, j6, grip) or object { j1, j2, j3, j4, j5, j6, grip }.
    */
-  updateLivePose(j1, j2, j3, j4 = 0.0, j5 = 90.0, j6 = 0.0, grip = 0.0) {
-    let p = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 90.0, j6: 0 };
+  updateLivePose(j1, j2, j3, j4 = 0.0, j5 = 0.0, j6 = 0.0, grip = 0.0) {
+    let p = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0.0, j6: 0 };
     if (typeof j1 === 'object' && j1 !== null) {
       p = {
         j1: Number(j1.j1 ?? 0),
         j2: Number(j1.j2 ?? 0),
         j3: Number(j1.j3 ?? 0),
         j4: Number(j1.j4 ?? 0),
-        j5: Number(j1.j5 ?? 90.0),
+        j5: Number(j1.j5 ?? 0.0),
         j6: Number(j1.j6 ?? (j1.grip ?? 0))
       };
     } else {
@@ -406,7 +487,7 @@ export class RobotModel {
         j2: Number(j2 ?? 0),
         j3: Number(j3 ?? 0),
         j4: Number(j4 ?? 0),
-        j5: Number(j5 ?? 90.0),
+        j5: Number(j5 ?? 0.0),
         j6: Number(j6 ?? (grip ?? 0))
       };
     }
@@ -414,6 +495,9 @@ export class RobotModel {
     this.targetLivePose = { ...p };
     if (this._meshesLoaded) {
       this._applyPoseToAssembly(this.liveArm, this.targetLivePose);
+      if (this.liveArm && this.liveArm.root) {
+        this.liveArm.root.updateMatrixWorld(true);
+      }
     }
     this.currentLivePose = { ...this.targetLivePose };
   }
@@ -422,15 +506,15 @@ export class RobotModel {
    * Apply joint angles to ghost target robot arm.
    * Supports (j1, j2, j3, j4, j5, j6, grip) or object { j1, j2, j3, j4, j5, j6, grip }.
    */
-  updateGhostPose(j1, j2, j3, j4 = 0.0, j5 = 90.0, j6 = 0.0, grip = 0.0) {
-    let p = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 90.0, j6: 0 };
+  updateGhostPose(j1, j2, j3, j4 = 0.0, j5 = 0.0, j6 = 0.0, grip = 0.0) {
+    let p = { j1: 0, j2: 0, j3: 0, j4: 0, j5: 0.0, j6: 0 };
     if (typeof j1 === 'object' && j1 !== null) {
       p = {
         j1: Number(j1.j1 ?? 0),
         j2: Number(j1.j2 ?? 0),
         j3: Number(j1.j3 ?? 0),
         j4: Number(j1.j4 ?? 0),
-        j5: Number(j1.j5 ?? 90.0),
+        j5: Number(j1.j5 ?? 0.0),
         j6: Number(j1.j6 ?? (j1.grip ?? 0))
       };
     } else {
@@ -439,13 +523,16 @@ export class RobotModel {
         j2: Number(j2 ?? 0),
         j3: Number(j3 ?? 0),
         j4: Number(j4 ?? 0),
-        j5: Number(j5 ?? 90.0),
+        j5: Number(j5 ?? 0.0),
         j6: Number(j6 ?? (grip ?? 0))
       };
     }
     this.ghostPose = { ...p };
     if (this._meshesLoaded) {
       this._applyPoseToAssembly(this.ghostArm, this.ghostPose);
+      if (this.ghostArm && this.ghostArm.root) {
+        this.ghostArm.root.updateMatrixWorld(true);
+      }
     }
   }
 
@@ -462,15 +549,64 @@ export class RobotModel {
     arm.j2.quaternion.setFromAxisAngle(AXES.j2, pose.j2 * DEG2RAD);
     arm.j3.quaternion.setFromAxisAngle(AXES.j3, pose.j3 * DEG2RAD);
     arm.j4.quaternion.setFromAxisAngle(AXES.j4, pose.j4 * DEG2RAD);
-    arm.j5.quaternion.setFromAxisAngle(AXES.j5, (pose.j5 - 90.0) * DEG2RAD);
+    arm.j5.quaternion.setFromAxisAngle(AXES.j5, pose.j5 * DEG2RAD);
     arm.j6.quaternion.setFromAxisAngle(AXES.j6, pose.j6 * DEG2RAD);
+    this._updateGhostDivergenceOpacity();
+  }
+
+  /**
+   * Modulates Ghost Arm link visibility & opacity based on cumulative upstream angular divergence
+   * from Live Arm so stationary base/links remain pure Satin Titanium without Z-fighting.
+   * @private
+   */
+  _updateGhostDivergenceOpacity() {
+    if (!this.materials || !this.materials.ghostBody || !this.materials.ghostAccent) return;
+    if (this.ghostArm && this.ghostArm.baseLink) {
+      this.ghostArm.baseLink.visible = true;
+    }
+
+    if (!this.isLiveVisible) {
+      // When live arm is hidden, ghost arm is the sole manipulator rendered
+      if (this.ghostArm && this.ghostArm.links) {
+        for (const k of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) {
+          if (this.ghostArm.links[k]) this.ghostArm.links[k].visible = true;
+        }
+      }
+      this.materials.ghostBody.opacity = 0.55;
+      this.materials.ghostAccent.opacity = 0.65;
+      return;
+    }
+
+    let maxDelta = 0;
+    let cumDelta = 0;
+    for (const k of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) {
+      const d = Math.abs(Number(this.ghostPose[k] || 0) - Number(this.currentLivePose[k] || 0));
+      if (d > maxDelta) maxDelta = d;
+      cumDelta += d;
+      if (this.ghostArm && this.ghostArm.links && this.ghostArm.links[k]) {
+        this.ghostArm.links[k].visible = true;
+      }
+    }
+    // Smooth ramp between 0.05 deg (coincident) and 0.8 deg (diverged)
+    const t = Math.max(0, Math.min(1, (maxDelta - 0.05) / 0.75));
+    this.materials.ghostBody.opacity = 0.20 + t * 0.35;
+    this.materials.ghostAccent.opacity = 0.25 + t * 0.40;
   }
 
   setGhostVisible(visible) {
-    this.options.showGhost = visible;
+    this.options.showGhost = Boolean(visible);
     if (this.ghostArm && this.ghostArm.root) {
-      this.ghostArm.root.visible = visible;
+      this.ghostArm.root.visible = this.options.showGhost;
     }
+    this._updateGhostDivergenceOpacity();
+  }
+
+  setLiveVisible(visible) {
+    this.options.showLive = Boolean(visible);
+    if (this.liveArm && this.liveArm.root) {
+      this.liveArm.root.visible = this.options.showLive;
+    }
+    this._updateGhostDivergenceOpacity();
   }
 
   getLiveTcpWorldPosition(target = new THREE.Vector3()) {

@@ -57,25 +57,25 @@
 }
 
 .console-title {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-md);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 6px;
 }
 
-/* Live indicator dot */
+/* Precision vertical instrument marker */
 .console-title::before {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #34d399;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--accent-neutral, #e2e8f0);
   flex-shrink: 0;
 }
 

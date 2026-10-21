@@ -100,8 +100,8 @@
      4. CRISP SUBTLE METALLIC BORDERS & DIVIDERS
      ========================================================================== */
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-metallic: #2a2f3b;
-  --border-subtle: #1e222b;
+  --border-metallic: #262a33;
+  --border-subtle: #1c1f26;
   --border-focus: rgba(226, 232, 240, 0.45);
 
   /* ==========================================================================
@@ -156,7 +156,7 @@
   --spacing-lg: 16px;
   --spacing-xl: 24px;
   --spacing-2xl: 32px;
-  --gap-panel: 8px;
+  --gap-panel: 4px;
   --gap-element: 4px;
 
   /* ==========================================================================
@@ -167,14 +167,17 @@
   --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 10px rgba(0, 0, 0, 0.5);
   --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.6);
   --shadow-inset-well: inset 0 1px 3px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  --bevel-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --well-recessed: inset 0 1px 3px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --tick-pattern-fine: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0px, rgba(255, 255, 255, 0.08) 1px, transparent 1px, transparent 10%);
 
-  /* Border Radii (Clean, Refined Rounded Chamfers) */
+  /* Border Radii (Machined CNC Instrument Chamfers) */
   --radius-none: 0px;
-  --radius-xs: 3px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-pill: 9999px;
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-pill: 3px;
 
   /* ==========================================================================
      8. MOTION & TRANSITIONS

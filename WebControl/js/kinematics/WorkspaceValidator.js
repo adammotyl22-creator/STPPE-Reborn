@@ -2,9 +2,9 @@
  * WorkspaceValidator.js - Safety Boundary and Workspace Validation Engine
  * 
  * Validates workspace safety constraints against URDF arm limits:
- * - Joint soft limits (J1: [-90, 90], J2: [-65, 115], J3: [-35, 170], J4: [-90, 90], J5: [-90, 90], J6: [-180, 180])
+ * - Joint soft limits (J1: [-90, 90], J2: [-65, 115], J3: [-35, 170], J4: [-90, 90], J5: [-120, 120], J6: [-180, 180])
  * - Floor clearance safety plane (FLOOR_CLR = 20mm for TCP and Elbow)
- * - Base exclusion cylinder (r < 80mm when Z < BASE_H 143.896mm)
+ * - Base exclusion cylinder (r < 100mm when Z < BASE_H 143.896mm)
  * - Anti-collision heuristics
  */
 
@@ -16,6 +16,7 @@ import {
   EXCL_R2,
   JOINT_LIMITS,
   forwardKinematics,
+  forwardKinematics6DOF,
   DEG_TO_RAD
 } from './RobotKinematics.js';
 
@@ -52,7 +53,7 @@ export function validateFloorClearance(tcpZ, elbowZ = null, gripperZ = null) {
 }
 
 /**
- * Validates cylindrical base exclusion zone (r < 80mm when z < BASE_H)
+ * Validates cylindrical base exclusion zone (r < 100mm when z < BASE_H)
  * @param {number} x - X coordinate (mm)
  * @param {number} y - Y coordinate (mm)
  * @param {number} z - Z coordinate (mm)
@@ -80,15 +81,17 @@ export function validateSelfCollision(j2, j3) {
  * @param {number} j2 - Joint 2 angle (deg)
  * @param {number} j3 - Joint 3 angle (deg)
  * @param {number} [j4=0] - Joint 4 roll angle (deg)
- * @param {number} [j5=90] - Joint 5 pitch angle (deg)
+ * @param {number} [j5=0] - Joint 5 pitch angle (deg)
  * @param {number} [j6=0] - Joint 6 tool roll angle (deg)
  * @returns {Object} { safe: boolean, valid: boolean, violations: string[], reason?: string, tcp: {x,y,z} }
  */
-export function checkWorkspace(j1, j2, j3, j4 = 0.0, j5 = 90.0, j6 = 0.0) {
+export function checkWorkspace(j1, j2, j3, j4 = 0.0, j5 = 0.0, j6 = 0.0, options = {}) {
   const violations = validateJointLimits(j1, j2, j3, j4, j5, j6);
 
   // Compute forward kinematics to check geometry
-  const fk = forwardKinematics(j1, j2, j3, {}, null, j4, j5, j6);
+  const armFk = forwardKinematics(j1, j2, j3, {}, null, j4, j5, j6);
+  const flangeFk = forwardKinematics6DOF(j1, j2, j3, j4, j5, j6, options);
+  const fk = { ...armFk, ...flangeFk, p2: armFk.p2, pGripper: flangeFk.rawTcp };
 
   // Floor clearance check (TCP)
   if (fk.tcp.z < FLOOR_CLR) {
@@ -107,7 +110,7 @@ export function checkWorkspace(j1, j2, j3, j4 = 0.0, j5 = 90.0, j6 = 0.0) {
     violations.push('ELBOW_FLOOR_BREACH');
   }
 
-  // Base exclusion cylinder check (r < 80mm and z < BASE_H)
+  // Base exclusion cylinder check (r < 100mm and z < BASE_H)
   const r_xy = Math.hypot(fk.tcp.x, fk.tcp.y);
   if (fk.tcp.z < BASE_H && r_xy < EXCL_R) {
     violations.push('BASE_EXCLUSION_BREACH');

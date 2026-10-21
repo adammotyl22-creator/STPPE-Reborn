@@ -56,7 +56,7 @@ export const JOINT_LIMITS = Object.freeze({
   j2: Object.freeze({ min: -65.0, max: 115.0, home: 0.0 }),
   j3: Object.freeze({ min: -35.0, max: 170.0, home: 0.0 }),
   j4: Object.freeze({ min: -90.0, max: 90.0, home: 0.0 }),
-  j5: Object.freeze({ min: -90.0, max: 90.0, home: 0.0 }),
+  j5: Object.freeze({ min: -120.0, max: 120.0, home: 0.0 }),
   j6: Object.freeze({ min: -180.0, max: 180.0, home: 0.0 }),
   grip: Object.freeze({ min: 0.0, max: 180.0, home: 90.0 })
 });
@@ -487,49 +487,59 @@ export function solveIK(x_target, y_target, z_target, options = {}) {
 
   // 7. Wrist Modes & Orientations (J4 Forearm Roll, J5 Wrist Pitch, J6 Tool Roll)
   const ang34 = j2 + j3;
-  let j4 = opts.j4Param !== undefined ? Number(opts.j4Param) : (opts.j4Manual !== undefined ? Number(opts.j4Manual) : 0.0);
+  let j4 = 0.0;
   let j5 = 0.0;
-  let j6 = opts.j6Param !== undefined ? Number(opts.j6Param) : 0.0;
+  let j6 = 0.0;
 
   const basePitchOffsetDeg = -(TOOL_REST_ANGLE * RAD_TO_DEG); // ~ -4.896 deg
 
   switch (modeNum) {
     case WristMode.LEVEL: // W0: LEVEL (Horizontal)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34;
+      j6 = 0.0;
       break;
 
     case WristMode.DOWN_0: // W1: DOWN_0 (Pointing straight down)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34 - 90.0;
+      j6 = 0.0;
       break;
 
     case WristMode.DOWN_90: // W2: DOWN_90 (Pointing straight down, roll 90)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34 - 90.0;
       j6 = 90.0;
       break;
 
     case WristMode.PITCH_0: // W3: PITCH_0 (Horizontal, custom roll)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34;
-      j6 = Number(opts.j5Param || 0);
+      j6 = opts.j6Param !== undefined ? Number(opts.j6Param) : Number(opts.j5Param || 0);
       break;
 
     case WristMode.PITCH_90: // W4: PITCH_90 (Down, custom roll)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34 - 90.0;
-      j6 = Number(opts.j5Param || 0);
+      j6 = opts.j6Param !== undefined ? Number(opts.j6Param) : Number(opts.j5Param || 0);
       break;
 
     case WristMode.PITCH_180: // W5: PITCH_180 (Upward 180, custom roll)
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34 + 90.0;
-      j6 = Number(opts.j5Param || 0);
+      j6 = opts.j6Param !== undefined ? Number(opts.j6Param) : Number(opts.j5Param || 0);
       break;
 
     case WristMode.MANUAL: // W6: MANUAL
       j4 = Number(opts.j4Param !== undefined ? opts.j4Param : (opts.j4Manual !== undefined ? opts.j4Manual : 0.0));
       j5 = pitch_deg - (TOOL_REST_ANGLE * RAD_TO_DEG) - ang34;
-      j6 = Number(opts.j6Param || 0.0);
+      j6 = Number(opts.j6Param !== undefined ? opts.j6Param : (opts.j5Param !== undefined && opts.j4Param !== undefined && opts.pitch !== undefined ? opts.j6Param : (opts.j6Param || 0.0)));
       break;
 
     default:
+      j4 = 0.0;
       j5 = basePitchOffsetDeg - ang34;
+      j6 = 0.0;
   }
 
   // Soft limit clamping for J4, J5, J6
@@ -604,6 +614,49 @@ export function rotMatToRpy(R) {
   return { roll, pitch, yaw };
 }
 
+/** ZYX Euler angles to a unit quaternion, matching firmware MOVL6DOF. */
+export function eulerToQuat(rollDeg, pitchDeg, yawDeg) {
+  const hr = rollDeg * DEG_TO_RAD * 0.5;
+  const hp = pitchDeg * DEG_TO_RAD * 0.5;
+  const hy = yawDeg * DEG_TO_RAD * 0.5;
+  const cr = Math.cos(hr), sr = Math.sin(hr);
+  const cp = Math.cos(hp), sp = Math.sin(hp);
+  const cy = Math.cos(hy), sy = Math.sin(hy);
+  return { w: cr * cp * cy + sr * sp * sy,
+    x: sr * cp * cy - cr * sp * sy,
+    y: cr * sp * cy + sr * cp * sy,
+    z: cr * cp * sy - sr * sp * cy };
+}
+
+/** Unit quaternion to ZYX Euler angles in degrees. */
+export function quatToEuler(q) {
+  return {
+    roll: Math.atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y)) * RAD_TO_DEG,
+    pitch: Math.asin(clamp(2 * (q.w * q.y - q.z * q.x), -1, 1)) * RAD_TO_DEG,
+    yaw: Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * RAD_TO_DEG
+  };
+}
+
+/** Shortest-path spherical interpolation with normalized linear fallback. */
+export function quatSlerp(q1, q2, t) {
+  let dot = q1.w * q2.w + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
+  if (dot < 0) {
+    q2 = { w: -q2.w, x: -q2.x, y: -q2.y, z: -q2.z };
+    dot = -dot;
+  }
+  let s1 = 1 - t, s2 = t;
+  if (dot <= 0.9995) {
+    const theta0 = Math.acos(clamp(dot, -1, 1));
+    const sinTheta0 = Math.sin(theta0);
+    s1 = Math.sin(theta0 * (1 - t)) / sinTheta0;
+    s2 = Math.sin(theta0 * t) / sinTheta0;
+  }
+  const out = { w: s1 * q1.w + s2 * q2.w, x: s1 * q1.x + s2 * q2.x,
+    y: s1 * q1.y + s2 * q2.y, z: s1 * q1.z + s2 * q2.z };
+  const norm = Math.hypot(out.w, out.x, out.y, out.z);
+  return norm > 1e-9 ? { w: out.w / norm, x: out.x / norm, y: out.y / norm, z: out.z / norm } : { ...q1 };
+}
+
 /**
  * Full 6-DOF Forward Kinematics
  * Returns TCP position, orientation matrix R06, and tool direction unit vector
@@ -633,14 +686,14 @@ export function forwardKinematics6DOF(j1_deg, j2_deg, j3_deg, j4_deg = 0, j5_deg
     z: j5_z
   };
 
-  const forearm_pitch = Math.PI / 2.0 - th2;
+  const pitch_base = TOOL_REST_ANGLE + j2r + j3r;
   const c1 = Math.cos(j1r), s1 = Math.sin(j1r);
-  const cp = Math.cos(forearm_pitch), sp = Math.sin(forearm_pitch);
+  const cp = Math.cos(pitch_base), sp = Math.sin(pitch_base);
 
   const R03 = [
-    [c1 * cp, -s1, c1 * sp],
-    [s1 * cp,  c1, s1 * sp],
-    [-sp,       0, cp]
+    [c1 * cp, -s1, -c1 * sp],
+    [s1 * cp,  c1, -s1 * sp],
+    [sp,       0, cp]
   ];
 
   const c4 = Math.cos(j4r), s4 = Math.sin(j4r);
@@ -653,9 +706,9 @@ export function forwardKinematics6DOF(j1_deg, j2_deg, j3_deg, j4_deg = 0, j5_deg
     [0, s4,  c4]
   ];
   const Ry5 = [
-    [ c5, 0, s5],
+    [ c5, 0, -s5],
     [  0, 1,  0],
-    [-s5, 0, c5]
+    [ s5, 0, c5]
   ];
   const Rx6 = [
     [1,  0,   0],
@@ -689,10 +742,11 @@ export function forwardKinematics6DOF(j1_deg, j2_deg, j3_deg, j4_deg = 0, j5_deg
     z: p5.z + TOOL_TOTAL_LEN * u_tool.z
   };
 
+  const localTool = [Number(toolOffset.x) || 0, Number(toolOffset.y) || 0, Number(toolOffset.z) || 0];
   const tcp = raw ? rawTcp : {
-    x: rawTcp.x + (workOffset.x || 0) - (toolOffset.x || 0),
-    y: rawTcp.y + (workOffset.y || 0) - (toolOffset.y || 0),
-    z: rawTcp.z + (workOffset.z || 0) - (toolOffset.z || 0)
+    x: rawTcp.x + R06[0][0] * localTool[0] + R06[0][1] * localTool[1] + R06[0][2] * localTool[2] + (workOffset.x || 0),
+    y: rawTcp.y + R06[1][0] * localTool[0] + R06[1][1] * localTool[1] + R06[1][2] * localTool[2] + (workOffset.y || 0),
+    z: rawTcp.z + R06[2][0] * localTool[0] + R06[2][1] * localTool[1] + R06[2][2] * localTool[2] + (workOffset.z || 0)
   };
 
   const rpy = rotMatToRpy(R06);
@@ -734,19 +788,16 @@ export function solveIK6DOF(x_target, y_target, z_target, rollDeg = 0, pitchDeg 
   const warnings = [];
   let clamped = false;
 
-  let x = x_target - (workOffset.x || 0) + (toolOffset.x || 0);
-  let y = y_target - (workOffset.y || 0) + (toolOffset.y || 0);
-  let z = z_target - (workOffset.z || 0) + (toolOffset.z || 0);
+  const x = x_target - (workOffset.x || 0);
+  const y = y_target - (workOffset.y || 0);
+  const z = z_target - (workOffset.z || 0);
 
   const R06 = rpyToRotMat(rollDeg, pitchDeg, yawDeg);
-  const ux = R06[0][0];
-  const uy = R06[1][0];
-  const uz = R06[2][0];
-
   // 1. Decouple Wrist Center P5
-  const x5 = x - TOOL_TOTAL_LEN * ux;
-  const y5 = y - TOOL_TOTAL_LEN * uy;
-  const z5 = z - TOOL_TOTAL_LEN * uz;
+  const tLocal = [TOOL_TOTAL_LEN + (Number(toolOffset.x) || 0), Number(toolOffset.y) || 0, Number(toolOffset.z) || 0];
+  const x5 = x - (R06[0][0] * tLocal[0] + R06[0][1] * tLocal[1] + R06[0][2] * tLocal[2]);
+  const y5 = y - (R06[1][0] * tLocal[0] + R06[1][1] * tLocal[1] + R06[1][2] * tLocal[2]);
+  const z5 = z - (R06[2][0] * tLocal[0] + R06[2][1] * tLocal[1] + R06[2][2] * tLocal[2]);
 
   // 2. Base J1 (Shoulder singularity damping when r5 ~ 0)
   const r5 = Math.hypot(x5, y5);
@@ -826,16 +877,15 @@ export function solveIK6DOF(x_target, y_target, z_target, rollDeg = 0, pitchDeg 
   const j1r = j1 * DEG_TO_RAD;
   const j2r = j2 * DEG_TO_RAD;
   const j3r = j3 * DEG_TO_RAD;
-  const th2 = TH2_0 - (j2r + j3r);
-  const forearm_pitch = Math.PI / 2.0 - th2;
+  const pitch_base = TOOL_REST_ANGLE + j2r + j3r;
 
   const c1 = Math.cos(j1r), s1 = Math.sin(j1r);
-  const cp = Math.cos(forearm_pitch), sp = Math.sin(forearm_pitch);
+  const cp = Math.cos(pitch_base), sp = Math.sin(pitch_base);
 
   const R03 = [
-    [c1 * cp, -s1, c1 * sp],
-    [s1 * cp,  c1, s1 * sp],
-    [-sp,       0, cp]
+    [c1 * cp, -s1, -c1 * sp],
+    [s1 * cp,  c1, -s1 * sp],
+    [sp,       0, cp]
   ];
 
   // 5. Wrist Rotation: R36 = R03^T * R06
@@ -861,47 +911,46 @@ export function solveIK6DOF(x_target, y_target, z_target, rollDeg = 0, pitchDeg 
   const sinJ5_sq = R36[1][0] * R36[1][0] + R36[2][0] * R36[2][0];
   const sinJ5 = Math.sqrt(sinJ5_sq);
 
-  let j4, j5, j6;
-  const WRIST_SINGULARITY_EPS = 0.0436; // ~2.5 deg
-  const wristSingular = (sinJ5 < WRIST_SINGULARITY_EPS);
+  // FIX: Decompose R36 = Rx(J4) * Ry(-J5) * Rx(J6) in both sign branches.
+  const wrapAngleDeltaDeg = angle => ((angle + 180) % 360 + 360) % 360 - 180;
+  const j5_1 = Math.atan2(sinJ5, cosJ5) * RAD_TO_DEG;
+  const j4_1 = Math.atan2(-R36[1][0], R36[2][0]) * RAD_TO_DEG;
+  const j6_1 = Math.atan2(-R36[0][1], -R36[0][2]) * RAD_TO_DEG;
+  const j5_2 = Math.atan2(-sinJ5, cosJ5) * RAD_TO_DEG;
+  const j4_2 = Math.atan2(R36[1][0], -R36[2][0]) * RAD_TO_DEG;
+  const j6_2 = Math.atan2(R36[0][1], R36[0][2]) * RAD_TO_DEG;
 
+  const inLimit = (val, lim) => val >= lim.min - 0.01 && val <= lim.max + 0.01;
+  const b1_valid = inLimit(j4_1, JOINT_LIMITS.j4) && inLimit(j5_1, JOINT_LIMITS.j5) && inLimit(j6_1, JOINT_LIMITS.j6);
+  const b2_valid = inLimit(j4_2, JOINT_LIMITS.j4) && inLimit(j5_2, JOINT_LIMITS.j5) && inLimit(j6_2, JOINT_LIMITS.j6);
+  const prevJ4 = currentAngles.j4 || 0;
+  const prevJ5 = currentAngles.j5 || 0;
+  const prevJ6 = currentAngles.j6 || 0;
+  const dist1 = Math.abs(wrapAngleDeltaDeg(j4_1 - prevJ4)) + Math.abs(wrapAngleDeltaDeg(j5_1 - prevJ5)) + Math.abs(wrapAngleDeltaDeg(j6_1 - prevJ6));
+  const dist2 = Math.abs(wrapAngleDeltaDeg(j4_2 - prevJ4)) + Math.abs(wrapAngleDeltaDeg(j5_2 - prevJ5)) + Math.abs(wrapAngleDeltaDeg(j6_2 - prevJ6));
+  const useBranch2 = b1_valid && !b2_valid ? false : b2_valid && !b1_valid ? true : dist2 < dist1;
+  const rawJ4 = useBranch2 ? j4_2 : j4_1;
+  const rawJ5 = useBranch2 ? j5_2 : j5_1;
+  const rawJ6 = useBranch2 ? j6_2 : j6_1;
+
+  let j4, j5 = rawJ5, j6;
+  const WRIST_SINGULARITY_EPS = 0.0436; // sin(2.5 deg)
+  const wristSingular = sinJ5 < WRIST_SINGULARITY_EPS;
   if (wristSingular) {
-    j5 = Math.acos(cosJ5) * RAD_TO_DEG;
-    j4 = currentAngles.j4 || 0;
-    const totalRoll = Math.atan2(R36[2][1] - R36[1][2], R36[1][1] + R36[2][2]) * RAD_TO_DEG;
-    j6 = totalRoll - j4;
-    while (j6 > 180.0) j6 -= 360.0;
-    while (j6 < -180.0) j6 += 360.0;
-  } else {
-    const j5_1 = Math.atan2(sinJ5, cosJ5) * RAD_TO_DEG;
-    const j4_1 = Math.atan2(R36[1][0], -R36[2][0]) * RAD_TO_DEG;
-    const j6_1 = Math.atan2(R36[0][1], R36[0][2]) * RAD_TO_DEG;
-
-    const j5_2 = Math.atan2(-sinJ5, cosJ5) * RAD_TO_DEG;
-    const j4_2 = Math.atan2(-R36[1][0], R36[2][0]) * RAD_TO_DEG;
-    const j6_2 = Math.atan2(-R36[0][1], -R36[0][2]) * RAD_TO_DEG;
-
-    const inLimit = (val, lim) => val >= lim.min - 1e-3 && val <= lim.max + 1e-3;
-    const b1_valid = inLimit(j4_1, JOINT_LIMITS.j4) && inLimit(j5_1, JOINT_LIMITS.j5) && inLimit(j6_1, JOINT_LIMITS.j6);
-    const b2_valid = inLimit(j4_2, JOINT_LIMITS.j4) && inLimit(j5_2, JOINT_LIMITS.j5) && inLimit(j6_2, JOINT_LIMITS.j6);
-
-    const prevJ4 = currentAngles.j4 || 0;
-    const prevJ5 = currentAngles.j5 || 0;
-    const prevJ6 = currentAngles.j6 || 0;
-
-    if (b1_valid && !b2_valid) {
-      j4 = j4_1; j5 = j5_1; j6 = j6_1;
-    } else if (b2_valid && !b1_valid) {
-      j4 = j4_2; j5 = j5_2; j6 = j6_2;
+    // When J5 is within +/-2.5 deg of zero, J4 and J6 axes become collinear.
+    // Lock J4 to previous orientation angle to avoid kinematic flip, and allocate remainder to J6.
+    j4 = prevJ4;
+    let totalRoll;
+    if (cosJ5 >= 0) {
+      totalRoll = Math.atan2(R36[2][1] - R36[1][2], R36[1][1] + R36[2][2]) * RAD_TO_DEG;
+      j6 = wrapAngleDeltaDeg(totalRoll - j4);
     } else {
-      const dist1 = Math.abs(j4_1 - prevJ4) + Math.abs(j5_1 - prevJ5) + Math.abs(j6_1 - prevJ6);
-      const dist2 = Math.abs(j4_2 - prevJ4) + Math.abs(j5_2 - prevJ5) + Math.abs(j6_2 - prevJ6);
-      if (dist2 < dist1) {
-        j4 = j4_2; j5 = j5_2; j6 = j6_2;
-      } else {
-        j4 = j4_1; j5 = j5_1; j6 = j6_1;
-      }
+      totalRoll = Math.atan2(R36[1][2] + R36[2][1], R36[1][1] - R36[2][2]) * RAD_TO_DEG;
+      j6 = wrapAngleDeltaDeg(j4 - totalRoll);
     }
+  } else {
+    j4 = rawJ4;
+    j6 = rawJ6;
   }
 
   if (j4 < JOINT_LIMITS.j4.min || j4 > JOINT_LIMITS.j4.max) {

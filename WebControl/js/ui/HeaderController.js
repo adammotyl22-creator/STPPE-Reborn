@@ -67,6 +67,7 @@ export class HeaderController {
     this.estopActive = false;
     this.homingActive = false;
     this.speedOverride = 100;
+    this.opMode = 'AUTO';
 
     // DOM Binding tracking
     this.container = null;
@@ -468,6 +469,34 @@ export class HeaderController {
     return cmd;
   }
 
+  async toggleOpMode() {
+    if (!this.serialManager || !this.serialManager.isConnected()) {
+      this.appState?.addConsoleLog({ type: 'WARN', text: 'Connect to the robot before changing mode' });
+      return false;
+    }
+    const nextMode = this.opMode === 'AUTO' ? 'T1' : 'AUTO';
+    await this.serialManager.send(`MODE ${nextMode}\n`);
+    this.opMode = nextMode;
+    const button = this._domElements.modeToggleBtn;
+    if (button) {
+      button.textContent = `MODE ${nextMode}`;
+      button.setAttribute('aria-pressed', String(nextMode === 'T1'));
+      button.setAttribute('aria-label', `Control mode: ${nextMode}. Switch to ${nextMode === 'T1' ? 'AUTO' : 'T1'}`);
+      button.title = `Switch control mode from ${nextMode} to ${nextMode === 'T1' ? 'AUTO' : 'T1'}`;
+    }
+    this.appState?.addConsoleLog({ type: 'TX', text: `MODE ${nextMode}` });
+    return nextMode;
+  }
+
+  triggerControlledStop() {
+    const cmd = 'STOP\n';
+    if (this.serialManager && this.serialManager.isConnected()) {
+      this.serialManager.send(cmd).catch((err) => console.error('Failed to dispatch STOP:', err));
+      this.appState?.addConsoleLog({ type: 'TX', text: 'STOP: controlled deceleration requested' });
+    }
+    return cmd;
+  }
+
   // ==========================================================================
   // HOMING CONTROLS
   // ==========================================================================
@@ -724,6 +753,21 @@ export class HeaderController {
     }
 
     // 6. Glowing Crimson ESTOP Button
+    const modeToggleBtn = container.querySelector('#btn_mode_toggle');
+    if (modeToggleBtn) {
+      this._domElements.modeToggleBtn = modeToggleBtn;
+      const onModeClick = () => this.toggleOpMode().catch((err) => console.error('Failed to change mode:', err));
+      modeToggleBtn.addEventListener('click', onModeClick);
+      this._eventCleanups.push(() => modeToggleBtn.removeEventListener('click', onModeClick));
+    }
+
+    const controlledStopBtn = container.querySelector('#btn_controlled_stop');
+    if (controlledStopBtn) {
+      const onStopClick = () => this.triggerControlledStop();
+      controlledStopBtn.addEventListener('click', onStopClick);
+      this._eventCleanups.push(() => controlledStopBtn.removeEventListener('click', onStopClick));
+    }
+
     const estopBtn = container.querySelector('[data-action="estop"], #btn_estop');
     if (estopBtn) {
       this._domElements.estopBtn = estopBtn;

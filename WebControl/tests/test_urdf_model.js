@@ -57,6 +57,7 @@ for (const file of meshFiles) {
 const model = new RobotModel({ showGhost: true, shadows: true });
 assert(model.root instanceof THREE.Group, 'RobotModel has root Three.js Group');
 assert(model.isGhostVisible === true, 'RobotModel isGhostVisible returns true by default');
+assert(model.isLiveVisible === true, 'RobotModel isLiveVisible returns true by default');
 
 model._cachedGeometries = geometries;
 model.liveArm = model._buildArmAssembly(geometries, false);
@@ -101,7 +102,7 @@ model.getLiveTcpWorldPosition(tcpPos);
 const motionDistance = tcpPos.distanceTo(tcpBefore);
 assert(motionDistance > 50.0, `Joint motion articulates arm: TCP moved ${motionDistance.toFixed(2)}mm`);
 
-// 6. Test Ghost Visibility
+// 6. Test Ghost & Live Visibility
 model.setGhostVisible(false);
 assert(model.ghostArm.root.visible === false, 'setGhostVisible(false) hides ghost arm');
 assert(model.isGhostVisible === false, 'isGhostVisible reflects hidden status');
@@ -109,6 +110,16 @@ assert(model.isGhostVisible === false, 'isGhostVisible reflects hidden status');
 model.setGhostVisible(true);
 assert(model.ghostArm.root.visible === true, 'setGhostVisible(true) shows ghost arm');
 assert(model.isGhostVisible === true, 'isGhostVisible reflects shown status');
+
+model.setLiveVisible(false);
+assert(model.liveArm.root.visible === false, 'setLiveVisible(false) hides live arm');
+assert(model.isLiveVisible === false, 'isLiveVisible reflects hidden status');
+assert(model.ghostArm.baseLink.visible === true, 'ghostArm baseLink remains visible when live arm is hidden');
+
+model.setLiveVisible(true);
+assert(model.liveArm.root.visible === true, 'setLiveVisible(true) shows live arm');
+assert(model.isLiveVisible === true, 'isLiveVisible reflects shown status');
+assert(model.ghostArm.baseLink.visible === true, 'ghostArm baseLink is visible when live arm is shown');
 
 // 7. Test Dispose
 model.dispose();

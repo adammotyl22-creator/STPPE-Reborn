@@ -10,7 +10,7 @@
  */
 
 import * as THREE from '../../vendor/three/three.module.js';
-import { threeToRobotCoords, robotToThreeCoords } from '../kinematics/RobotKinematics.js';
+import { threeToRobotCoords, robotToThreeCoords, clamp, forwardKinematics6DOF } from '../kinematics/RobotKinematics.js';
 
 // Axis constraint modes
 export const AxisConstraint = Object.freeze({
@@ -47,6 +47,7 @@ export class TcpDragController {
     this.tcpWorldPos = new THREE.Vector3();
     this.dragStartWorldPos = new THREE.Vector3();
     this.dragStartPointer = new THREE.Vector2();
+    this.dragStartOrientation = { pitch: 0, roll: 0 };
 
     // Axis constraint state
     this._axisConstraint = AxisConstraint.NONE;
@@ -280,7 +281,7 @@ export class TcpDragController {
           });
         }
       }
-      if (this.robotModel.liveArm && (!this.robotModel.ghostArm || !this.robotModel.isGhostVisible)) {
+      if (this.robotModel.liveArm && this.robotModel.isLiveVisible && (!this.robotModel.ghostArm || !this.robotModel.isGhostVisible)) {
         const live = this.robotModel.liveArm;
         if (live.tcp) {
           live.tcp.traverse(child => {
@@ -416,9 +417,19 @@ export class TcpDragController {
         this._dragOffset.copy(hit.point).sub(this.tcpWorldPos);
       }
 
-      // Capture initial robot coords snapshot
+      // Capture initial robot coords snapshot & orientation
       const robotSnap = threeToRobotCoords(this.tcpWorldPos.x, this.tcpWorldPos.y, this.tcpWorldPos.z);
       this._frozenRobotCoords = { x: robotSnap.x, y: robotSnap.y, z: robotSnap.z };
+
+      let initialPitch = 0;
+      let initialRoll = 0;
+      if (this.robotModel && this.robotModel.ghostPose) {
+        const gp = this.robotModel.ghostPose;
+        const fk = forwardKinematics6DOF(gp.j1 || 0, gp.j2 || 0, gp.j3 || 0, gp.j4 || 0, gp.j5 || 0, gp.j6 || 0);
+        initialPitch = fk.pitch || 0;
+        initialRoll = fk.roll || 0;
+      }
+      this.dragStartOrientation = { pitch: initialPitch, roll: initialRoll };
 
       // Highlight active gizmo handle
       if (mesh.userData && mesh.userData.visualMesh) {
@@ -458,8 +469,10 @@ export class TcpDragController {
         if (typeof this.onDrag === 'function' && this._frozenRobotCoords) {
           const out = { ...this._frozenRobotCoords };
           if (this._axisConstraint === AxisConstraint.PITCH) {
+            out.pitch = clamp(this.dragStartOrientation.pitch + angleDelta, -90, 90);
             out.pitchDelta = angleDelta;
           } else {
+            out.roll = clamp(this.dragStartOrientation.roll + angleDelta, -180, 180);
             out.rollDelta = angleDelta;
           }
           this.onDrag(out);
@@ -517,15 +530,15 @@ export class TcpDragController {
           }
         }
 
-        // Working envelope reach clamping (limited to 430.0mm radial)
+        // Working envelope reach clamping (limited to 443.0mm radial, 590.0mm vertical)
         const radialDist = Math.hypot(outX, outY);
-        const maxReach = 430.0;
+        const maxReach = 443.0;
         if (radialDist > maxReach && radialDist > 1e-4) {
           const scale = maxReach / radialDist;
           outX *= scale;
           outY *= scale;
         }
-        const clampedZ = Math.max(20.0, Math.min(555.0, outZ));
+        const clampedZ = Math.max(20.0, Math.min(590.0, outZ));
 
         // Update live Gizmo position to reflect clamped coordinates
         const threeClamped = robotToThreeCoords(outX, outY, clampedZ);

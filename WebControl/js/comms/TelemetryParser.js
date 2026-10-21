@@ -22,6 +22,16 @@ export function parseSerialLine(rawLine) {
 
   const now = Date.now();
 
+  const tcpNumber = '([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)';
+  const tcpResult = line.match(new RegExp(`^TCPCAL: TCP X=${tcpNumber} Y=${tcpNumber} Z=${tcpNumber} mm, RMS=${tcpNumber} mm(?: \\(EEPROM save scheduled\\))?$`));
+  if (tcpResult) {
+    return {
+      type: 'TCPCAL_RESULT', timestamp: now,
+      x: Number(tcpResult[1]), y: Number(tcpResult[2]), z: Number(tcpResult[3]),
+      rmsErrorMm: Number(tcpResult[4]), raw: line
+    };
+  }
+
   // 1. JSON Telemetry (JTELEM 10Hz stream or STATUS query)
   if (line.startsWith('{') && line.endsWith('}')) {
     try {
@@ -32,8 +42,9 @@ export function parseSerialLine(rawLine) {
         j1: Number(data.j1 ?? 0),
         j2: Number(data.j2 ?? 0),
         j3: Number(data.j3 ?? 0),
-        j4: Number(data.j4 ?? 90),
-        j5: Number(data.j5 ?? 90),
+        j4: Number(data.j4 ?? 0),
+        j5: Number(data.j5 ?? 0),
+        j6: Number(data.j6 ?? 0),
         grip: Number(data.grip ?? 0),
         x: Number(data.x ?? 0),
         y: Number(data.y ?? 0),
@@ -320,6 +331,9 @@ export class TelemetryParser {
 
     // Specific typed events
     switch (packet.type) {
+      case 'TCPCAL_RESULT':
+        this.emit('tcpcal', packet);
+        break;
       case 'JTELEM':
         this.emit('jtelem', packet);
         break;

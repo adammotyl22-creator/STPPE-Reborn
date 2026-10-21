@@ -274,17 +274,20 @@ export function buildJogCommand(axis, val) {
   if (strAxis === '3' || strAxis === 'J3' || strAxis === 'D3') {
     return `D3 ${numVal.toFixed(2)}\n`;
   }
-  if (strAxis === '4' || strAxis === 'J4' || strAxis === 'A4') {
-    const clamped = Math.min(180, Math.max(0, numVal));
+  if (strAxis === '4' || strAxis === 'J4' || strAxis === 'A4' || strAxis === 'D4') {
+    const clamped = Math.min(90, Math.max(-90, numVal));
     return `A4 ${clamped.toFixed(1)}\n`;
   }
-  if (strAxis === '5' || strAxis === 'J5' || strAxis === 'A5') {
-    const clamped = Math.min(180, Math.max(0, numVal));
+  if (strAxis === '5' || strAxis === 'J5' || strAxis === 'A5' || strAxis === 'D5') {
+    const clamped = Math.min(90, Math.max(-90, numVal));
     return `A5 ${clamped.toFixed(1)}\n`;
   }
   if (strAxis === '6' || strAxis === 'J6' || strAxis === 'A6' || strAxis === 'D6') {
     const clamped = Math.min(180, Math.max(-180, numVal));
     return `A6 ${clamped.toFixed(1)}\n`;
+  }
+  if (strAxis === 'GRIP' || strAxis === 'G') {
+    return buildGripCommand(numVal);
   }
   throw new Error(`Invalid jog axis: ${axis}`);
 }

@@ -47,7 +47,7 @@
 .timeline-meta-time {
   font-family: var(--font-mono, monospace);
   font-size: 11px;
-  color: #38bdf8;
+  color: var(--text-primary, #f8fafc);
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -138,7 +138,7 @@
 }
 
 .timeline-block.drag-over {
-  border-left: 3px solid #38bdf8 !important;
+  border-left: 3px solid var(--accent-amber, #f59e0b) !important;
 }
 
 /* Spline Move (Green) */

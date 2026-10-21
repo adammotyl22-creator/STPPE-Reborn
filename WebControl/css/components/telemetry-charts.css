@@ -10,8 +10,8 @@
 .telemetry-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
+  gap: 5px;
+  padding: 6px 8px;
   background: var(--bg-panel);
   border: 1px solid var(--border-metallic);
   border-radius: var(--radius-xs);
@@ -44,83 +44,95 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 8px;
+  padding: 3px 8px;
   background: var(--bg-card);
   border: 1px solid var(--border-metallic);
   border-radius: var(--radius-xs);
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--bevel-highlight);
 }
 
 .telemetry-title {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-md);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 6px;
 }
 
-/* Live indicator */
+/* Precision vertical instrument marker */
 .telemetry-title::before {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #34d399;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--accent-amber, #f59e0b);
   flex-shrink: 0;
 }
 
 /* ============================================================================
-   STATUS HUD GAUGES & METRICS GRID
+   STATUS HUD GAUGES & METRICS STRIP (COMPACT HARDWARE READOUT ROW)
    ============================================================================ */
 
 .status-hud-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
   flex-shrink: 0;
 }
 
-/* Inset digital readout well */
+@media (max-width: 1400px) {
+  .status-hud-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Inset digital readout cell */
 .hud-card {
-  background: var(--bg-card);
+  background: var(--bg-inset);
   border: 1px solid var(--border-metallic);
-  border-radius: var(--radius-xs);
-  padding: 6px 8px;
+  border-radius: 2px;
+  padding: 3px 6px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   justify-content: space-between;
-  gap: 3px;
-  box-shadow: var(--shadow-sm);
+  gap: 4px;
+  min-height: 24px;
+  box-shadow: var(--well-recessed);
   transition: border-color var(--transition-fast);
+  overflow: hidden;
 }
 
 .hud-card:hover { border-color: rgba(255, 255, 255, 0.15); }
 
 .hud-card-label {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-2xs);
+  font-family: var(--font-mono);
+  font-size: 9px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-sm);
+  letter-spacing: 0.03em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hud-card-value {
-  font-size: var(--font-size-md);
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: 700;
   font-family: var(--font-telemetry);
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 4px;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Status pill badges within HUD cards */
@@ -128,14 +140,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-xs);
-  padding: 2px 7px;
-  border-radius: var(--radius-xs);
-  font-size: var(--font-size-2xs);
-  font-weight: 600;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 700;
   font-family: var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-sm);
+  letter-spacing: 0.03em;
   cursor: default;
   border: 1px solid transparent;
   transition: all var(--transition-fast);
@@ -163,8 +175,8 @@
 
 /* Homing state badges */
 .badge-homing.idle {
-  background: var(--bg-inset);
-  color: var(--text-muted);
+  background: var(--bg-card);
+  color: var(--text-secondary);
   border-color: var(--border-metallic);
 }
 
@@ -195,7 +207,7 @@
 }
 
 .badge-closed-loop.cl-off {
-  background: var(--bg-inset);
+  background: var(--bg-card);
   color: var(--text-muted);
   border-color: var(--border-metallic);
   cursor: pointer;
@@ -208,15 +220,10 @@
 
 /* Speed & rate gauges */
 .badge-speed  { color: var(--text-primary); }
-.badge-rate   { color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
+.badge-rate   { color: var(--text-primary); display: inline-flex; align-items: center; gap: 4px; }
 
 .speed-meter-bar {
-  width: 100%;
-  height: 4px;
-  background: var(--bg-inset);
-  border-radius: 2px;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
+  display: none;
 }
 
 .speed-meter-fill {
@@ -228,7 +235,7 @@
 .rate-pulse-dot {
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: 1px;
   background: #34d399;
   display: inline-block;
   flex-shrink: 0;
@@ -252,12 +259,12 @@
   animation: estop-active-pulse 0.8s infinite alternate;
 }
 
-.collision-axis-dots { display: flex; gap: var(--spacing-xs); }
+.collision-axis-dots { display: none; }
 
 .collision-axis-pill {
   font-size: var(--font-size-2xs);
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
+  padding: 1px 4px;
+  border-radius: 2px;
   font-family: var(--font-mono);
   font-weight: 500;
   background: var(--bg-inset);
@@ -280,9 +287,9 @@
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-sm);
+  gap: 6px;
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 115px;
 }
 
 @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
@@ -291,44 +298,50 @@
   background: var(--bg-card);
   border: 1px solid var(--border-metallic);
   border-radius: var(--radius-xs);
-  padding: 6px 8px;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  min-height: 130px;
+  gap: 4px;
+  min-height: 120px;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--bevel-highlight);
 }
 
 .chart-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .chart-card-title {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-2xs);
-  font-weight: 600;
-  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-md);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Per-axis channel pills */
 .chart-channel-pills {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 3px;
+  flex-shrink: 0;
 }
 
 .channel-pill {
-  font-size: var(--font-size-2xs);
+  font-size: 9px;
   font-family: var(--font-mono);
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 2px;
   background: var(--bg-inset);
   border: 1px solid var(--border-metallic);
   color: var(--text-muted);
@@ -336,6 +349,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  white-space: nowrap;
   transition: all var(--transition-fast);
 }
 
@@ -379,7 +393,7 @@
   border-radius: 2px;
   border: 1px solid var(--border-metallic);
   overflow: hidden;
-  box-shadow: var(--shadow-inset);
+  box-shadow: var(--well-recessed);
 }
 
 .chart-canvas,

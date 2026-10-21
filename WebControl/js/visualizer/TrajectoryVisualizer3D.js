@@ -11,6 +11,8 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import {
   forwardKinematics,
+  forwardKinematics6DOF,
+  rpyToRotMat,
   solveIK,
   robotToThreeCoords,
   threeToRobotCoords,
@@ -47,6 +49,7 @@ export class TrajectoryVisualizer3D {
       samplesPerSegment: 16,
       hidePastWaypoints: true,
       maxRenderedNodes: 48,
+      triadLength: 12,
       maxTubularSegments: 320
     }, options);
 
@@ -61,6 +64,8 @@ export class TrajectoryVisualizer3D {
     this.glowGroup.name = 'Trajectory_Glow_Group';
     this.nodesGroup = new THREE.Group();
     this.nodesGroup.name = 'Trajectory_Nodes_Group';
+    this.triadsGroup = new THREE.Group();
+    this.triadsGroup.name = 'Trajectory_TCP_Orientation_Triads';
     this.activeGroup = new THREE.Group();
     this.activeGroup.name = 'Trajectory_Active_Group';
     // MOVL straight-line segment overlays (renders over spline tube)
@@ -71,6 +76,7 @@ export class TrajectoryVisualizer3D {
     this.root.add(this.glowGroup);
     this.root.add(this.linMovlGroup);
     this.root.add(this.nodesGroup);
+    this.root.add(this.triadsGroup);
     this.root.add(this.activeGroup);
 
     // Active playback cursor
@@ -113,7 +119,7 @@ export class TrajectoryVisualizer3D {
     // Include a compact coordinate fingerprint so any in-place waypoint edit
     // (including j4/j5 wrist pitch/roll or moveType) correctly invalidates the mesh.
     const coordHash = waypoints.map(w =>
-      `${(+w.j1).toFixed(1)},${(+w.j2).toFixed(1)},${(+w.j3).toFixed(1)},${(+w.j4).toFixed(1)},${(+w.j5).toFixed(1)},${(+w.j6).toFixed(1)},${+(w.dur ?? w.duration ?? 1000)},${w.moveType || w.type || 'spline'}`
+      `${(+w.j1).toFixed(1)},${(+w.j2).toFixed(1)},${(+w.j3).toFixed(1)},${(+w.j4).toFixed(1)},${(+w.j5).toFixed(1)},${(+w.j6).toFixed(1)},${w.roll},${w.pitch},${w.yaw},${w.frame},${+(w.dur ?? w.duration ?? 1000)},${w.moveType || w.type || 'spline'}`
     ).join('|');
     const seqKey = `${sequence?.sequenceName || 'seq'}_${waypoints.length}_${sequence?.loop ? 1 : 0}_${coordHash}`;
     const structureChanged = (seqKey !== this._lastSeqKey);
@@ -154,8 +160,15 @@ export class TrajectoryVisualizer3D {
       const j3 = Number(wp.j3 ?? 90);
       const j4 = Number(wp.j4 ?? 90);
       const j5 = Number(wp.j5 ?? 90);
+      const j6 = Number(wp.j6 ?? 0);
 
       const fk = forwardKinematics(j1, j2, j3, {}, null, j4, j5);
+      const orientation = forwardKinematics6DOF(j1, j2, j3, j4, j5, j6);
+      const hasEuler = ['roll', 'pitch', 'yaw'].every(key =>
+        wp[key] !== undefined && wp[key] !== null && Number.isFinite(Number(wp[key])));
+      const rotation = hasEuler
+        ? rpyToRotMat(wp.roll, wp.pitch, wp.yaw)
+        : orientation.R06;
       const threeCoords = robotToThreeCoords(fk.tcp.x, fk.tcp.y, fk.tcp.z);
       const threePos = new THREE.Vector3(threeCoords.x, threeCoords.y, threeCoords.z);
 
@@ -168,12 +181,14 @@ export class TrajectoryVisualizer3D {
         wp,
         robotTcp: { x: fk.tcp.x, y: fk.tcp.y, z: fk.tcp.z },
         threePos,
+        rotation,
         isReachable
       };
     });
 
     // 2. Render Waypoint Node Spheres and Rings
     this._renderWaypointNodes();
+    this._renderOrientationTriads();
 
     // 3. Build Smooth Catmull-Rom 3D Spline Tube for full path
     if (this.waypointPositions.length >= 2) {
@@ -240,6 +255,29 @@ export class TrajectoryVisualizer3D {
       dropRing.userData = { isWaypointNode: true, waypointIndex: item.index, waypointId: item.wp.id };
       this.nodesGroup.add(dropRing);
     });
+  }
+
+  /** Renders the requested TCP axes at every keyframe, including sampled-out nodes. */
+  _renderOrientationTriads() {
+    const length = this.options.triadLength;
+    const colors = [[1, 0.25, 0.25], [0.25, 1, 0.4], [0.3, 0.55, 1]];
+    for (const item of this.waypointPositions) {
+      const vertices = [];
+      const vertexColors = [];
+      for (let axis = 0; axis < 3; axis++) {
+        const direction = robotToThreeCoords(
+          item.rotation[0][axis], item.rotation[1][axis], item.rotation[2][axis]);
+        vertices.push(0, 0, 0, direction.x * length, direction.y * length, direction.z * length);
+        vertexColors.push(...colors[axis], ...colors[axis]);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(vertexColors, 3));
+      const axes = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+      axes.position.copy(item.threePos);
+      axes.userData = { waypointIndex: item.index, waypointId: item.wp.id, frame: item.wp.frame };
+      this.triadsGroup.add(axes);
+    }
   }
 
   /**
@@ -529,6 +567,17 @@ export class TrajectoryVisualizer3D {
   _clearPreviousMeshes() {
     this._clearTubeGroup();
     this._clearLinMovlGroup();
+
+    while (this.triadsGroup.children.length > 0) {
+      const child = this.triadsGroup.children[0];
+      this.triadsGroup.remove(child);
+      if (child.geometry && typeof child.geometry.dispose === 'function') child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach(material => material && typeof material.dispose === 'function' && material.dispose());
+      } else if (child.material && typeof child.material.dispose === 'function') {
+        child.material.dispose();
+      }
+    }
 
     while (this.nodesGroup.children.length > 0) {
       const child = this.nodesGroup.children[0];

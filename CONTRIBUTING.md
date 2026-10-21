@@ -1,5 +1,7 @@
 # Contributing to STPPE Reborn
 
+**English** · [Polski](CONTRIBUTING.pl.md)
+
 [Project overview](README.md) · [Setup guide](docs/GETTING_STARTED.md) · [Roadmap](docs/ROADMAP.md)
 
 Contributions can improve the control software, firmware, CAD, documentation, or the evidence behind the physical build. Start with the simulator if you do not have the hardware.

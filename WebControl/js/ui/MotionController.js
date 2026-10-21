@@ -24,6 +24,9 @@ import {
   forwardKinematics6DOF,
   solveIK,
   solveIK6DOF,
+  eulerToQuat,
+  quatSlerp,
+  quatToEuler,
   clamp
 } from '../kinematics/RobotKinematics.js';
 import { checkWorkspace } from '../kinematics/WorkspaceValidator.js';
@@ -43,16 +46,16 @@ export const JOINT_CONFIGS = Object.freeze({
   j2: { min: -65.0, max: 115.0, step: 0.1, default: 0.0, label: 'Joint 2 (Shoulder)' },
   j3: { min: -35.0, max: 170.0, step: 0.1, default: 0.0, label: 'Joint 3 (Elbow)' },
   j4: { min: -90.0, max: 90.0, step: 0.1, default: 0.0, label: 'Joint 4 (Forearm Roll)' },
-  j5: { min: -90.0, max: 90.0, step: 0.1, default: 0.0, label: 'Joint 5 (Wrist Pitch)' },
+  j5: { min: -120.0, max: 120.0, step: 0.1, default: 0.0, label: 'Joint 5 (Wrist Pitch)' },
   j6: { min: -180.0, max: 180.0, step: 0.1, default: 0.0, label: 'Joint 6 (Tool Roll)' },
   grip: { min: 0.0, max: 180.0, step: 1.0, default: 0.0, label: 'Gripper' }
 });
 
 export const CARTESIAN_CONFIGS = Object.freeze({
-  x: { min: -500.0, max: 430.0, step: 1.0, default: 253.5 },
-  y: { min: -500.0, max: 385.0, step: 1.0, default: 0.0 },
-  z: { min: -50.0, max: 555.0, step: 1.0, default: 141.0 },
-  r: { min: 0.0, max: 430.0, step: 1.0, default: 253.5 },
+  x: { min: -500.0, max: 500.0, step: 1.0, default: 253.5 },
+  y: { min: -500.0, max: 500.0, step: 1.0, default: 0.0 },
+  z: { min: -50.0, max: 590.0, step: 1.0, default: 141.0 },
+  r: { min: 0.0, max: 443.0, step: 1.0, default: 253.5 },
   theta: { min: -90.0, max: 90.0, step: 0.1, default: 0.0 }
 });
 
@@ -71,6 +74,10 @@ export class MotionController {
   constructor(options = {}) {
     this.appState = options.appState || defaultAppState;
     this.serialManager = options.serialManager || null;
+    this._serialDataUnsub = null;
+    this.toolOffset = { x: 0, y: 0, z: 0 };
+    this.workOffset = { x: 0, y: 0, z: 0 };
+    this.linearPreview = [];
     this.autoSend = options.autoSend !== undefined ? Boolean(options.autoSend) : true;
     this.duration = Math.max(1, Number(options.defaultDuration || options.duration || 2000));
 
@@ -178,7 +185,7 @@ export class MotionController {
       },
       stow: {
         name: 'Stow',
-        joints: { j1: 0.0, j2: -65.0, j3: 160.0, j4: 0.0, j5: -85.0, j6: 0.0, grip: 0.0 }
+        joints: { j1: 0.0, j2: -60.0, j3: 160.0, j4: 0.0, j5: -85.0, j6: 0.0, grip: 0.0 }
       }
     });
 
@@ -193,6 +200,7 @@ export class MotionController {
 
     // Subscribe to AppState updates
     this._initAppStateListeners();
+    this.setSerialManager(this.serialManager);
 
     // Bind DOM if container is provided and environment supports DOM
     if (options.container && typeof document !== 'undefined') {
@@ -216,12 +224,23 @@ export class MotionController {
     const unsubTelem = this.appState.subscribe('telemetry:updated', (live) => {
       if (this._autoSyncWithLive) {
         this.setGhostToLive(false);
+      } else {
+        this._updateJointDualMarkers();
       }
     });
     this._unsubState.push(unsubTelem);
 
     // Watch for safety changes (e.g. ESTOP)
     const unsubSafety = this.appState.subscribe('safety:estop', (estop) => {
+      if (estop) {
+        this._stopHoldJog();
+        if (this._liveStreamTimer) {
+          clearTimeout(this._liveStreamTimer);
+          this._liveStreamTimer = null;
+        }
+        this._pendingStreamSend = false;
+        this.setExecutionMode('preview', false);
+      }
       this._updateMoveButtonsState(estop);
     });
     this._unsubState.push(unsubSafety);
@@ -238,7 +257,37 @@ export class MotionController {
    * @param {WebSerialManager} manager
    */
   setSerialManager(manager) {
+    if (this._serialDataUnsub) this._serialDataUnsub();
     this.serialManager = manager;
+    this._serialDataUnsub = manager?.on?.('data', (packet) => {
+      if (packet?.type !== 'TCPCAL_RESULT') return;
+      this.toolOffset = { x: packet.x, y: packet.y, z: packet.z };
+      for (const axis of ['x', 'y', 'z']) {
+        const input = this.container?.querySelector(`#input_tool_${axis}`);
+        if (input) input.value = String(packet[axis]);
+      }
+      this._setTcpStatus(`TCP X=${packet.x} Y=${packet.y} Z=${packet.z} mm; RMS=${packet.rmsErrorMm} mm`);
+      this._recomputeFK();
+      this._evaluateReachability();
+      this._syncToAppState();
+      this._updateDomUI();
+    }) || null;
+  }
+
+  _setTcpStatus(message) {
+    const status = this.container?.querySelector('#tcp_cal_status');
+    if (status) status.textContent = message;
+    this.appState?.addConsoleLog?.({ type: 'INFO', text: message });
+  }
+
+  async _sendTcpCommand(command) {
+    if (!this.serialManager?.isConnected?.()) {
+      this._setTcpStatus('Connect to the robot before changing TCP calibration or offsets.');
+      return false;
+    }
+    await this.serialManager.send(`${command}\n`);
+    this.appState?.addConsoleLog?.({ type: 'TX', text: command });
+    return true;
   }
 
   // ==========================================================================
@@ -306,6 +355,20 @@ export class MotionController {
   // ==========================================================================
 
   /**
+   * Returns true only when Live Direct Drive is explicitly armed and autoSend is enabled
+   * (and not inside a high-frequency hold-jog loop that handles its own 20Hz throttling).
+   * @returns {boolean}
+   */
+  isLiveFollowActive() {
+    return Boolean(
+      this.autoSend &&
+      this.executionMode === 'direct_drive' &&
+      this.isArmed &&
+      !this._activeHoldJog?.isHeld
+    );
+  }
+
+  /**
    * Sets a specific joint angle, clamps to soft limits, recalculates FK and updates Ghost pose
    * 
    * @param {'j1'|'j2'|'j3'|'j4'|'j5'|'grip'} joint
@@ -334,7 +397,7 @@ export class MotionController {
 
     if (sendToRobot) {
       this.sendGhostToRobot();
-    } else if (this.autoSend) {
+    } else if (this.isLiveFollowActive()) {
       if (isContinuous) {
         this._queueLiveStream();
       } else {
@@ -367,7 +430,7 @@ export class MotionController {
     this._syncToAppState();
     this._updateDomUI();
 
-    if (sendToRobot || this.autoSend) {
+    if (sendToRobot || this.isLiveFollowActive()) {
       this.sendGhostToRobot();
     }
 
@@ -400,7 +463,7 @@ export class MotionController {
     const current = this.joints[key] ?? 0;
     const dur = Math.max(250, Math.min(800, Math.round(Math.abs(delta) * 80)));
     const res = this.setJointTarget(key, current + Number(delta), false, false);
-    if (sendToRobot || this.autoSend) {
+    if (sendToRobot || this.isLiveFollowActive()) {
       this.sendMovSpline({ duration: dur }).catch(() => {});
     }
     return res;
@@ -489,18 +552,25 @@ export class MotionController {
         this.cartesian.roll || 0,
         this.cartesian.pitch || 0,
         this.cartesian.yaw || 0,
-        { currentAngles: this.joints }
+        { currentAngles: this.joints, toolOffset: this.toolOffset, workOffset: this.workOffset }
       );
     } else {
+      const isManual = this.cartesian.wristMode === WristMode.MANUAL;
       ik = solveIK(this.cartesian.x, this.cartesian.y, this.cartesian.z, {
         wristMode: this.cartesian.wristMode,
-        j4Param: this.cartesian.j4Param,
+        pitch: isManual ? (this.cartesian.pitch ?? this.cartesian.j5Param) : undefined,
+        j4Param: isManual ? (this.joints.j4 ?? this.cartesian.j4Param) : this.cartesian.j4Param,
         j5Param: this.cartesian.j5Param,
-        j6Param: this.cartesian.j6Param,
-        currentAngles: { j2: this.joints.j2, j3: this.joints.j3 }
+        j6Param: isManual ? (this.joints.j6 ?? this.cartesian.j6Param) : this.cartesian.j6Param,
+        currentAngles: { j2: this.joints.j2, j3: this.joints.j3 },
+        toolOffset: this.toolOffset,
+        workOffset: this.workOffset
       });
-      if (ik && ik.success) {
-        const fk = forwardKinematics6DOF(ik.j1, ik.j2, ik.j3, ik.j4, ik.j5, ik.j6);
+      if (ik && !isNaN(ik.j1) && !isNaN(ik.j2) && !isNaN(ik.j3) && !isNaN(ik.j4) && !isNaN(ik.j5) && !isNaN(ik.j6)) {
+        const fk = forwardKinematics6DOF(ik.j1, ik.j2, ik.j3, ik.j4, ik.j5, ik.j6, {
+          toolOffset: this.toolOffset,
+          workOffset: this.workOffset
+        });
         this.cartesian.roll = Number(fk.roll.toFixed(1));
         this.cartesian.pitch = Number(fk.pitch.toFixed(1));
         this.cartesian.yaw = Number(fk.yaw.toFixed(1));
@@ -524,7 +594,7 @@ export class MotionController {
 
     if (sendToRobot) {
       this.sendMovSpline();
-    } else if (this.autoSend) {
+    } else if (this.isLiveFollowActive()) {
       if (isContinuous) {
         this._queueLiveStream();
       } else {
@@ -610,16 +680,17 @@ export class MotionController {
       }
     }
 
+    const targetWristMode = this.cartesian.orientationMode === 'preset' ? this.cartesian.wristMode : null;
     const res = this.setCartesianTarget(
       targetX,
       targetY,
       targetZ,
-      this.cartesian.wristMode,
+      targetWristMode,
       null,
       false,
       false
     );
-    if (sendToRobot || this.autoSend) {
+    if (sendToRobot || this.isLiveFollowActive()) {
       this.sendMovSpline({ duration: dur }).catch(() => {});
     }
     return res;
@@ -657,7 +728,7 @@ export class MotionController {
       { [key]: newVal }
     );
 
-    if (sendToRobot || this.autoSend) {
+    if (sendToRobot || this.isLiveFollowActive()) {
       this.sendMovSpline({ duration: 500 }).catch(() => {});
     }
     return res;
@@ -705,6 +776,8 @@ export class MotionController {
     this.cartesian.orientationMode = mode === 'preset' ? 'preset' : '6dof';
     if (this.cartesian.orientationMode === '6dof') {
       this._recomputeFK();
+    } else {
+      this.setWristMode(this.cartesian.wristMode);
     }
     this._evaluateReachability();
     this._syncToAppState();
@@ -858,11 +931,7 @@ export class MotionController {
           const stepText = (this.jointStepSize < 1) ? this.jointStepSize.toFixed(1) : String(this.jointStepSize);
           btn.setAttribute('data-step', String(dir * this.jointStepSize));
 
-          if (!btn.classList || !btn.classList.contains('tactile-step-btn')) {
-            btn.textContent = `${sign}${stepText}°`;
-          } else {
-            btn.textContent = sign;
-          }
+          btn.textContent = `${sign}${stepText}°`;
 
           const joint = btn.getAttribute('data-nudge-joint') || 'j1';
           btn.title = `Jog ${joint.toUpperCase()} ${sign}${stepText}° [Hold to accelerate]`;
@@ -942,14 +1011,19 @@ export class MotionController {
    * @param {number} mode - WristMode constant (0-6)
    * @param {number} [j4Param=null]
    * @param {number} [j5Param=null]
+   * @param {number} [j6Param=null]
    */
-  setWristMode(mode, j4Param = null, j5Param = null) {
+  setWristMode(mode, j4Param = null, j5Param = null, j6Param = null) {
     this.cartesian.wristMode = clamp(Math.round(Number(mode)), 0, 6);
+    this.cartesian.orientationMode = 'preset';
     if (j4Param !== null && j4Param !== undefined) {
-      this.cartesian.j4Param = clamp(Number(j4Param), 0, 180);
+      this.cartesian.j4Param = clamp(Number(j4Param), -90, 90);
     }
     if (j5Param !== null && j5Param !== undefined) {
-      this.cartesian.j5Param = clamp(Number(j5Param), 0, 180);
+      this.cartesian.j5Param = clamp(Number(j5Param), -90, 90);
+    }
+    if (j6Param !== null && j6Param !== undefined) {
+      this.cartesian.j6Param = clamp(Number(j6Param), -180, 180);
     }
 
     return this.setCartesianTarget(
@@ -1042,7 +1116,7 @@ export class MotionController {
     const dy = overrideParams.dy ?? this.dy;
 
     // Safety workspace verification
-    const ws = checkWorkspace(j1, j2, j3, j4, j5, j6);
+    const ws = checkWorkspace(j1, j2, j3, j4, j5, j6, { toolOffset: this.toolOffset, workOffset: this.workOffset });
     if (!ws.safe) {
       const err = new Error(`Motion rejected by Workspace Safety: ${ws.violations.join(', ')}`);
       err.violations = ws.violations;
@@ -1092,11 +1166,23 @@ export class MotionController {
       const pitch = Number(overrideParams.pitch ?? this.cartesian.pitch ?? 0);
       const yaw = Number(overrideParams.yaw ?? this.cartesian.yaw ?? 0);
 
-      const ik = solveIK6DOF(x, y, z, roll, pitch, yaw, { currentAngles: this.joints });
+      const ik = solveIK6DOF(x, y, z, roll, pitch, yaw, { currentAngles: this.joints, toolOffset: this.toolOffset, workOffset: this.workOffset });
       if (!ik.success || ik.clamped) {
         throw new Error(`Linear move target unreachable: ${ik.warnings.join(', ')}`);
       }
       cmd = buildMovOrientationCommand(x, y, z, roll, pitch, yaw, dur, true);
+      const start = forwardKinematics6DOF(this.joints.j1, this.joints.j2, this.joints.j3, this.joints.j4, this.joints.j5, this.joints.j6, { toolOffset: this.toolOffset, workOffset: this.workOffset });
+      const q0 = eulerToQuat(start.roll, start.pitch, start.yaw);
+      const q1 = eulerToQuat(roll, pitch, yaw);
+      this.linearPreview = Array.from({ length: 21 }, (_, index) => {
+        const t = index / 20;
+        return {
+          x: start.tcp.x + (x - start.tcp.x) * t,
+          y: start.tcp.y + (y - start.tcp.y) * t,
+          z: start.tcp.z + (z - start.tcp.z) * t,
+          ...quatToEuler(quatSlerp(q0, q1, t))
+        };
+      });
     } else {
       const w = Number(overrideParams.wristMode ?? this.cartesian.wristMode);
       const j4 = Number(overrideParams.j4 ?? this.cartesian.j4Param);
@@ -1167,7 +1253,7 @@ export class MotionController {
    * Sends the current Ghost Target Pose directly to physical robot
    */
   sendGhostToRobot() {
-    return this.sendMovLinear();
+    return this.sendMovSpline();
   }
 
   /**
@@ -1196,7 +1282,8 @@ export class MotionController {
       this.joints.j3,
       this.joints.j4,
       this.joints.j5,
-      this.joints.j6
+      this.joints.j6,
+      { toolOffset: this.toolOffset, workOffset: this.workOffset }
     );
 
     this.cartesian.x = Number(fk.tcp.x.toFixed(1));
@@ -1223,15 +1310,19 @@ export class MotionController {
           this.cartesian.roll || 0,
           this.cartesian.pitch || 0,
           this.cartesian.yaw || 0,
-          { currentAngles: this.joints }
+          { currentAngles: this.joints, toolOffset: this.toolOffset, workOffset: this.workOffset }
         );
       } else {
+        const isManual = this.cartesian.wristMode === WristMode.MANUAL;
         ik = solveIK(this.cartesian.x, this.cartesian.y, this.cartesian.z, {
           wristMode: this.cartesian.wristMode,
-          j4Param: this.cartesian.j4Param,
+          pitch: isManual ? (this.cartesian.pitch ?? this.cartesian.j5Param) : undefined,
+          j4Param: isManual ? (this.joints.j4 ?? this.cartesian.j4Param) : this.cartesian.j4Param,
           j5Param: this.cartesian.j5Param,
-          j6Param: this.cartesian.j6Param,
-          currentAngles: { j2: this.joints.j2, j3: this.joints.j3 }
+          j6Param: isManual ? (this.joints.j6 ?? this.cartesian.j6Param) : this.cartesian.j6Param,
+          currentAngles: { j2: this.joints.j2, j3: this.joints.j3 },
+          toolOffset: this.toolOffset,
+          workOffset: this.workOffset
         });
       }
     }
@@ -1242,7 +1333,8 @@ export class MotionController {
       this.joints.j3,
       this.joints.j4,
       this.joints.j5,
-      this.joints.j6
+      this.joints.j6,
+      { toolOffset: this.toolOffset, workOffset: this.workOffset }
     );
 
     const warnings = [...(ik.warnings || [])];
@@ -1253,10 +1345,10 @@ export class MotionController {
     const isReachable = ik.success && !ik.clamped && ws.safe;
     let statusText = 'VALID (Reachable)';
 
-    if (!ik.success) {
+    if (ik.clamped || !ws.safe) {
+      statusText = warnings.length > 0 ? `WARNING: ${warnings.join(', ')}` : 'CLAMPED';
+    } else if (!ik.success) {
       statusText = 'OUT OF REACH';
-    } else if (ik.clamped || !ws.safe) {
-      statusText = `WARNING: ${warnings.join(', ')}`;
     }
 
     this.reachability = {
@@ -1295,23 +1387,6 @@ export class MotionController {
       warnings: this.reachability.warnings
     });
 
-    // Mirror pose to live telemetry ONLY when completely disconnected (offline demo mode)
-    const isConnected = this.serialManager && (this.serialManager.isConnected && this.serialManager.isConnected());
-
-    if (!isConnected) {
-      this.appState.updateLiveTelemetry({
-        j1: this.joints.j1,
-        j2: this.joints.j2,
-        j3: this.joints.j3,
-        j4: this.joints.j4,
-        j5: this.joints.j5,
-        j6: this.joints.j6,
-        grip: this.joints.grip,
-        x: this.cartesian.x,
-        y: this.cartesian.y,
-        z: this.cartesian.z
-      });
-    }
   }
 
   // ==========================================================================
@@ -1329,10 +1404,42 @@ export class MotionController {
     this.container = container;
     this._domBound = true;
 
-    // 1. Joint Sliders and Number Inputs
-    for (const joint of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'grip']) {
+    // 1. Joint Sliders and Number Inputs (J1..J6; gripper handled by _bindPersistentGripper)
+    for (const joint of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) {
       const slider = container.querySelector(`[data-joint-slider="${joint}"], #slider_${joint}`);
       const valInput = container.querySelector(`[data-joint-val="${joint}"], #val_${joint}`);
+      const liveMarker = container.querySelector(`[data-joint-live-marker="${joint}"]`);
+      const deltaSpan = container.querySelector(`[data-joint-delta-span="${joint}"]`);
+      const deltaBadge = container.querySelector(`[data-joint-delta-badge="${joint}"]`);
+      const cardRow = container.querySelector(`[data-joint-card="${joint}"]`);
+
+      if (liveMarker) this._domElements[`live_marker_${joint}`] = liveMarker;
+      if (deltaSpan) this._domElements[`delta_span_${joint}`] = deltaSpan;
+      if (deltaBadge) this._domElements[`delta_badge_${joint}`] = deltaBadge;
+
+      if (cardRow) {
+        this._domElements[`card_row_${joint}`] = cardRow;
+        const onEnter = () => {
+          cardRow.classList.add('is-highlighted');
+          this.setHighlightedJoint(joint);
+        };
+        const onLeave = () => {
+          cardRow.classList.remove('is-highlighted');
+          if (this._highlightedJoint === joint) {
+            this.setHighlightedJoint(null);
+          }
+        };
+        cardRow.addEventListener('pointerenter', onEnter);
+        cardRow.addEventListener('pointerleave', onLeave);
+        cardRow.addEventListener('focusin', onEnter);
+        cardRow.addEventListener('focusout', onLeave);
+        this._eventCleanups.push(() => {
+          cardRow.removeEventListener('pointerenter', onEnter);
+          cardRow.removeEventListener('pointerleave', onLeave);
+          cardRow.removeEventListener('focusin', onEnter);
+          cardRow.removeEventListener('focusout', onLeave);
+        });
+      }
 
       if (slider) {
         this._domElements[`slider_${joint}`] = slider;
@@ -1342,22 +1449,14 @@ export class MotionController {
         slider.value = this.joints[joint];
 
         const onSliderInput = (e) => {
-          if (joint === 'grip') {
-            this.setGripperMacro(parseFloat(e.target.value), this.autoSend);
-          } else {
-            this.setJointTarget(joint, parseFloat(e.target.value), false, true);
-          }
+          this.setJointTarget(joint, parseFloat(e.target.value), false, true);
         };
         slider.addEventListener('input', onSliderInput);
         this._eventCleanups.push(() => slider.removeEventListener('input', onSliderInput));
 
         const onSliderChange = (e) => {
-          if (joint === 'grip') {
-            this.setGripperMacro(parseFloat(e.target.value), true);
-          } else {
-            this.setJointTarget(joint, parseFloat(e.target.value), false, false);
-            this.flushFinalTarget();
-          }
+          this.setJointTarget(joint, parseFloat(e.target.value), false, false);
+          this.flushFinalTarget();
         };
         slider.addEventListener('change', onSliderChange);
         this._eventCleanups.push(() => slider.removeEventListener('change', onSliderChange));
@@ -1365,17 +1464,8 @@ export class MotionController {
 
       if (valInput) {
         this._domElements[`val_${joint}`] = valInput;
-        valInput.value = this.joints[joint].toFixed(joint === 'grip' ? 0 : 1);
-
-        if (joint !== 'grip') {
-          this._bindInlineBadgeInput(joint, valInput);
-        } else {
-          const onValChange = (e) => {
-            this.setGripperMacro(parseFloat(e.target.value), true);
-          };
-          valInput.addEventListener('change', onValChange);
-          this._eventCleanups.push(() => valInput.removeEventListener('change', onValChange));
-        }
+        valInput.value = this.joints[joint].toFixed(1);
+        this._bindInlineBadgeInput(joint, valInput);
       }
     }
 
@@ -1398,17 +1488,6 @@ export class MotionController {
       this._eventCleanups.push(() => pill.removeEventListener('click', onPillClick));
     });
 
-    // 3. Gripper Quick Macro Buttons
-    const gripMacroBtns = container.querySelectorAll('[data-grip-macro]');
-    gripMacroBtns.forEach((btn) => {
-      const macro = btn.getAttribute('data-grip-macro');
-      const onClick = () => {
-        this.setGripperMacro(macro, true);
-      };
-      btn.addEventListener('click', onClick);
-      this._eventCleanups.push(() => btn.removeEventListener('click', onClick));
-    });
-
     // 3.1 Live Control / AutoSend Toggles (Synchronized across all panels)
     const autoSendToggles = container.querySelectorAll('#check_joints_autosend, #check_ik_autosend, [data-auto-send-toggle]');
     autoSendToggles.forEach((toggle) => {
@@ -1424,7 +1503,14 @@ export class MotionController {
     });
 
     // 3.2 Send Joints to Robot & Sync Live Buttons
-    const btnSendJoints = container.querySelector('#btn_send_joints_robot, [data-action="send-joints-robot"]');
+    const root = (container?.closest && container.closest('#left-panel')) || container;
+    const queryEl = (sel) => {
+      return (root.querySelector ? root.querySelector(sel) : null) ||
+        (container.querySelector ? container.querySelector(sel) : null) ||
+        (typeof document !== 'undefined' ? document.querySelector(sel) : null);
+    };
+
+    const btnSendJoints = queryEl('#btn_send_joints_robot, [data-action="send-joints-robot"]');
     if (btnSendJoints) {
       const onSendJoints = () => {
         this.sendGhostToRobot();
@@ -1433,7 +1519,7 @@ export class MotionController {
       this._eventCleanups.push(() => btnSendJoints.removeEventListener('click', onSendJoints));
     }
 
-    const btnSyncLiveJoints = container.querySelector('#btn_sync_live_joints, [data-action="sync-live-to-joints"]');
+    const btnSyncLiveJoints = queryEl('#btn_sync_live_joints, [data-action="sync-live-to-joints"]');
     if (btnSyncLiveJoints) {
       const onSyncLive = () => {
         this.setGhostToLive(true);
@@ -1592,6 +1678,21 @@ export class MotionController {
       this._eventCleanups.push(() => btnOrientWrist.removeEventListener('click', onWristClick));
     }
 
+    const containerOrient6dof = container.querySelector('#container_orient_6dof');
+    if (containerOrient6dof) {
+      this._domElements.containerOrient6dof = containerOrient6dof;
+    }
+
+    const containerWristMode = container.querySelector('#container_wrist_mode');
+    if (containerWristMode) {
+      this._domElements.containerWristMode = containerWristMode;
+    }
+
+    const wrapperWristMode = container.querySelector('#wrapper_wrist_mode, #group_wrist_mode');
+    if (wrapperWristMode) {
+      this._domElements.wrapperWristMode = wrapperWristMode;
+    }
+
     // 5.4 6-DOF Tool Orientation Sliders (Roll, Pitch, Yaw)
     for (const axis of ['roll', 'pitch', 'yaw']) {
       const slider = container.querySelector(`[data-orient-slider="${axis}"], #slider_${axis}`);
@@ -1655,6 +1756,46 @@ export class MotionController {
       const onSave = () => this.saveBacklash().catch(() => {});
       btnBacklashSave.addEventListener('click', onSave);
       this._eventCleanups.push(() => btnBacklashSave.removeEventListener('click', onSave));
+    }
+
+    for (let pose = 1; pose <= 4; pose++) {
+      const button = container.querySelector(`#btn_tcp_cal_pose_${pose}`);
+      if (!button) continue;
+      const onClick = () => this._sendTcpCommand(`TCPCAL ${pose}`).then((sent) => {
+        if (sent) this._setTcpStatus(`Captured TCP calibration pose ${pose}.`);
+      }).catch((error) => this._setTcpStatus(`TCP capture failed: ${error.message}`));
+      button.addEventListener('click', onClick);
+      this._eventCleanups.push(() => button.removeEventListener('click', onClick));
+    }
+    for (const [id, command, message] of [
+      ['btn_tcp_cal_solve', 'TCPCAL SOLVE', 'Solving TCP calibration...'],
+      ['btn_tcp_cal_clear', 'TCPCAL CLEAR', 'TCP calibration poses cleared.']
+    ]) {
+      const button = container.querySelector(`#${id}`);
+      if (!button) continue;
+      const onClick = () => this._sendTcpCommand(command).then((sent) => {
+        if (sent) this._setTcpStatus(message);
+      }).catch((error) => this._setTcpStatus(`TCP command failed: ${error.message}`));
+      button.addEventListener('click', onClick);
+      this._eventCleanups.push(() => button.removeEventListener('click', onClick));
+    }
+    for (const kind of ['tool', 'work']) for (const axis of ['x', 'y', 'z']) {
+      const input = container.querySelector(`#input_${kind}_${axis}`);
+      if (!input) continue;
+      const onChange = () => {
+        const value = Number(input.value);
+        if (!Number.isFinite(value)) return;
+        this._sendTcpCommand(`${kind.toUpperCase()}${axis.toUpperCase()} ${value}`).then((sent) => {
+          if (!sent) return;
+          this[`${kind}Offset`][axis] = value;
+          this._recomputeFK();
+          this._evaluateReachability();
+          this._syncToAppState();
+          this._updateDomUI();
+        }).catch((error) => this._setTcpStatus(`Offset update failed: ${error.message}`));
+      };
+      input.addEventListener('change', onChange);
+      this._eventCleanups.push(() => input.removeEventListener('change', onChange));
     }
 
     // 5.7 Backlash Sliders and Inputs (J1..J6)
@@ -1754,14 +1895,14 @@ export class MotionController {
     }
 
     // 10. Live vs Ghost Sync Buttons
-    const syncGhostToLiveBtn = container.querySelector('[data-action="ghost-to-live"], #btn_ghost_to_live');
+    const syncGhostToLiveBtn = queryEl('[data-action="ghost-to-live"], #btn_ghost_to_live');
     if (syncGhostToLiveBtn) {
       const onSyncClick = () => this.setGhostToLive(true);
       syncGhostToLiveBtn.addEventListener('click', onSyncClick);
       this._eventCleanups.push(() => syncGhostToLiveBtn.removeEventListener('click', onSyncClick));
     }
 
-    const sendGhostBtn = container.querySelector('[data-action="send-ghost"], #btn_send_ghost');
+    const sendGhostBtn = queryEl('[data-action="send-ghost"], #btn_send_ghost');
     if (sendGhostBtn) {
       const onSendGhost = () => this.sendGhostToRobot().catch(() => {});
       sendGhostBtn.addEventListener('click', onSendGhost);
@@ -1789,7 +1930,7 @@ export class MotionController {
     }
 
     // 12. Mode Navigation Tabs (IK vs FK vs Trajectory)
-    const modeTabs = container.querySelectorAll('[data-mode-tab]');
+    const modeTabs = (root.querySelectorAll ? root.querySelectorAll('[data-mode-tab]') : container.querySelectorAll('[data-mode-tab]'));
     modeTabs.forEach((tabBtn) => {
       const tabKey = tabBtn.getAttribute('data-mode-tab');
       const onTabClick = () => {
@@ -1811,7 +1952,7 @@ export class MotionController {
     });
 
     // 14. Action Bar Plan Trajectory Button
-    const btnPlanTraj = container.querySelector('#btn_plan_trajectory, [data-action="plan-trajectory"]');
+    const btnPlanTraj = queryEl('#btn_plan_trajectory, [data-action="plan-trajectory"]');
     if (btnPlanTraj) {
       const onPlan = () => {
         this.planTrajectory();
@@ -1828,6 +1969,12 @@ export class MotionController {
 
     this._updateDomUI();
     this._updateStepJogUI('all');
+
+    // 17. Initial Mode Tab Synchronization
+    const initialModeTab = (this.appState?.getState && this.appState.getState('controlMode.activeTab')) ||
+      (root.querySelector?.('.panel-mode-tab.active')?.getAttribute('data-mode-tab')) ||
+      'ik';
+    this.setControlModeTab(initialModeTab);
   }
 
   /**
@@ -1860,6 +2007,9 @@ export class MotionController {
         }
       }
     }
+
+    this._updateJointDualMarkers();
+    this._updateGripperJawGraphic();
 
     // Update Mode Toggle Switch state
     if (this._domElements.toggleCyl && this._domElements.toggleCyl.checked !== this.isCylindricalMode) {
@@ -1976,12 +2126,46 @@ export class MotionController {
       this._domElements.durInput.value = this.duration;
     }
 
-    // Update Orientation Mode Button active states
+    // Update Orientation Mode Button active states and visibility
+    const is6DOF = this.cartesian.orientationMode === '6dof';
     if (this._domElements.btnOrient6dof) {
-      this._domElements.btnOrient6dof.classList.toggle('active', this.cartesian.orientationMode === '6dof');
+      this._domElements.btnOrient6dof.classList.toggle('active', is6DOF);
     }
     if (this._domElements.btnOrientWrist) {
-      this._domElements.btnOrientWrist.classList.toggle('active', this.cartesian.orientationMode !== '6dof');
+      this._domElements.btnOrientWrist.classList.toggle('active', !is6DOF);
+    }
+
+    // Hide sliders when in preset mode, and hide preset wrist mode when in 6dof mode
+    if (this._domElements.containerOrient6dof) {
+      this._domElements.containerOrient6dof.classList.toggle('hidden', !is6DOF);
+    }
+    const containerOrientPreset = this.container ? this.container.querySelector('#container_orient_preset') : null;
+    if (containerOrientPreset) {
+      containerOrientPreset.classList.toggle('hidden', is6DOF);
+    }
+    const wristModeWrapper = this._domElements.wrapperWristMode ||
+      (this._domElements.wristSelect ? this._domElements.wristSelect.closest('#wrapper_wrist_mode, .wrist-mode-group, div') : null);
+    if (wristModeWrapper) {
+      wristModeWrapper.classList.toggle('hidden', is6DOF);
+    }
+    if (this._domElements.containerWristMode) {
+      this._domElements.containerWristMode.classList.toggle('wrist-mode-hidden', is6DOF);
+    }
+
+    // Update active state on wrist preset chips & preset Euler readout
+    if (this.container) {
+      const activeMode = Number(this.cartesian.wristMode ?? 0);
+      const chips = this.container.querySelectorAll('[data-wrist-chip]');
+      chips.forEach((c) => {
+        const cMode = parseInt(c.getAttribute('data-wrist-chip'), 10);
+        c.classList.toggle('active', !is6DOF && cMode === activeMode);
+      });
+      const pR = this.container.querySelector('#preset_readout_roll');
+      const pP = this.container.querySelector('#preset_readout_pitch');
+      const pYW = this.container.querySelector('#preset_readout_yaw');
+      if (pR) pR.textContent = `${Number(this.cartesian.roll ?? 0).toFixed(1)}°`;
+      if (pP) pP.textContent = `${Number(this.cartesian.pitch ?? 0).toFixed(1)}°`;
+      if (pYW) pYW.textContent = `${Number(this.cartesian.yaw ?? 0).toFixed(1)}°`;
     }
 
     // Update Orientation Sliders & Inputs
@@ -2030,12 +2214,12 @@ export class MotionController {
       const b = this._domElements.reachBadge;
       if (this.reachability.isReachable) {
         b.textContent = i18n.t('ik.reachability.valid');
-      } else if (this.reachability.ikResult && !this.reachability.ikResult.success) {
+      } else if (this.reachability.ikResult && !this.reachability.ikResult.success && !this.reachability.clamped) {
         b.textContent = i18n.t('ik.reachability.invalid');
       } else {
         b.textContent = this.reachability.statusText;
       }
-      b.className = 'reachability-badge ' + (this.reachability.isReachable ? 'badge-safe' : 'badge-danger');
+      b.className = 'reachability-badge ' + (this.reachability.isReachable ? 'badge-safe' : (this.reachability.clamped ? 'badge-warning' : 'badge-danger'));
     }
 
     this._updateExecutionSafetyUI();
@@ -2069,9 +2253,13 @@ export class MotionController {
       this.appState.setControlModeTab(validTab);
     }
 
-    if (this.container) {
+    const root = (this.container?.closest && this.container.closest('#left-panel')) ||
+                 this.container ||
+                 (typeof document !== 'undefined' ? document.getElementById('left-panel') || document : null);
+
+    if (root) {
       // Update top tab buttons active class
-      const tabs = this.container.querySelectorAll('[data-mode-tab]');
+      const tabs = root.querySelectorAll ? root.querySelectorAll('[data-mode-tab]') : [];
       tabs.forEach((t) => {
         const isCurrent = t.getAttribute('data-mode-tab') === validTab;
         if (t.classList) {
@@ -2083,7 +2271,7 @@ export class MotionController {
       });
 
       // Synchronize container cards
-      const cards = this.container.querySelectorAll('.accordion-card[data-accordion]');
+      const cards = root.querySelectorAll ? root.querySelectorAll('.accordion-card[data-accordion]') : [];
       cards.forEach((card) => {
         const key = card.getAttribute('data-accordion');
         const isTarget = (key === validTab);
@@ -2095,6 +2283,19 @@ export class MotionController {
           header.setAttribute('aria-expanded', String(isTarget));
         }
       });
+
+      // Reveal / hide joint action buttons depending on whether joints tab is active
+      const isJoints = (validTab === 'joints');
+      const btnSyncLiveJoints = (root.querySelector ? root.querySelector('#btn_sync_live_joints, [data-action="sync-live-to-joints"]') : null) ||
+        (typeof document !== 'undefined' ? document.querySelector('#btn_sync_live_joints, [data-action="sync-live-to-joints"]') : null);
+      if (btnSyncLiveJoints) {
+        btnSyncLiveJoints.style.display = isJoints ? '' : 'none';
+      }
+      const btnSendJoints = (root.querySelector ? root.querySelector('#btn_send_joints_robot, [data-action="send-joints-robot"]') : null) ||
+        (typeof document !== 'undefined' ? document.querySelector('#btn_send_joints_robot, [data-action="send-joints-robot"]') : null);
+      if (btnSendJoints) {
+        btnSendJoints.style.display = isJoints ? '' : 'none';
+      }
     }
 
     return validTab;
@@ -2151,7 +2352,8 @@ export class MotionController {
             this.joints.j3,
             this.joints.j4,
             this.joints.j5,
-            this.joints.j6
+            this.joints.j6,
+            { toolOffset: this.toolOffset, workOffset: this.workOffset }
           )
         : (this._lastFk || forwardKinematics(this.joints.j1, this.joints.j2, this.joints.j3, {}, null, this.joints.j4, this.joints.j5, this.joints.j6));
       const R06 = fk.R06 || [
@@ -2167,9 +2369,24 @@ export class MotionController {
       const deltaY_base = R06[1][col] * delta;
       const deltaZ_base = R06[2][col] * delta;
 
-      const targetX = clamp(this.cartesian.x + deltaX_base, CARTESIAN_CONFIGS.x.min, CARTESIAN_CONFIGS.x.max);
-      const targetY = clamp(this.cartesian.y + deltaY_base, CARTESIAN_CONFIGS.y.min, CARTESIAN_CONFIGS.y.max);
-      const targetZ = clamp(this.cartesian.z + deltaZ_base, CARTESIAN_CONFIGS.z.min, CARTESIAN_CONFIGS.z.max);
+      // Scale uniformly if an axis bound is encountered so the 3D step vector stays collinear with the tool axis
+      let scale = 1.0;
+      const axesBounds = [
+        { curr: this.cartesian.x, d: deltaX_base, min: CARTESIAN_CONFIGS.x.min, max: CARTESIAN_CONFIGS.x.max },
+        { curr: this.cartesian.y, d: deltaY_base, min: CARTESIAN_CONFIGS.y.min, max: CARTESIAN_CONFIGS.y.max },
+        { curr: this.cartesian.z, d: deltaZ_base, min: CARTESIAN_CONFIGS.z.min, max: CARTESIAN_CONFIGS.z.max }
+      ];
+      for (const b of axesBounds) {
+        if (b.d > 1e-6 && b.curr + b.d > b.max) {
+          scale = Math.min(scale, Math.max(0, (b.max - b.curr) / b.d));
+        } else if (b.d < -1e-6 && b.curr + b.d < b.min) {
+          scale = Math.min(scale, Math.max(0, (b.min - b.curr) / b.d));
+        }
+      }
+
+      const targetX = this.cartesian.x + deltaX_base * scale;
+      const targetY = this.cartesian.y + deltaY_base * scale;
+      const targetZ = this.cartesian.z + deltaZ_base * scale;
 
       return this.setCartesianTarget(targetX, targetY, targetZ, null, null, false, false);
     } else {
@@ -2309,32 +2526,33 @@ export class MotionController {
    */
   _updateExecutionSafetyUI() {
     if (!this.container && typeof document === 'undefined') return;
-    const root = this.container || document;
+    const query = (sel) => (this.container && this.container.querySelector ? this.container.querySelector(sel) : null) ||
+      (typeof document !== 'undefined' ? document.querySelector(sel) : null);
 
     const isLive = (this.executionMode === 'direct_drive' && this.isArmed);
 
-    const toggle = root.querySelector('#toggle_direct_drive');
+    const toggle = query('#toggle_direct_drive');
     if (toggle) {
       toggle.checked = isLive;
     }
 
-    const banner = root.querySelector('#banner_direct_drive_active');
+    const banner = query('#banner_direct_drive_active');
     if (banner && banner.classList) {
       banner.classList.toggle('active', isLive);
       banner.classList.toggle('hidden', !isLive);
     }
 
-    const previewLabel = root.querySelector('#label_mode_preview');
+    const previewLabel = query('#label_mode_preview');
     if (previewLabel && previewLabel.classList) {
       previewLabel.classList.toggle('active', !isLive);
     }
 
-    const liveLabel = root.querySelector('#label_mode_live');
+    const liveLabel = query('#label_mode_live');
     if (liveLabel && liveLabel.classList) {
       liveLabel.classList.toggle('active', isLive);
     }
 
-    const statusBadge = root.querySelector('#badge_execution_mode');
+    const statusBadge = query('#badge_execution_mode');
     if (statusBadge) {
       if (isLive) {
         statusBadge.textContent = 'DIRECT DRIVE ACTIVE';
@@ -2351,12 +2569,13 @@ export class MotionController {
    * @private
    */
   _initSafetyModalListeners() {
-    if (typeof document === 'undefined') return;
+    const query = (sel) => (typeof document !== 'undefined' ? document.querySelector(sel) : null) ||
+      (this.container && this.container.querySelector ? this.container.querySelector(sel) : null);
 
-    const toggle = document.querySelector('#toggle_direct_drive');
-    const modal = document.querySelector('#modal_direct_drive_confirm');
-    const btnConfirm = document.querySelector('#btn_confirm_direct_drive');
-    const btnCancel = document.querySelector('#btn_cancel_direct_drive');
+    const toggle = query('#toggle_direct_drive');
+    const modal = query('#modal_direct_drive_confirm');
+    const btnConfirm = query('#btn_confirm_direct_drive');
+    const btnCancel = query('#btn_cancel_direct_drive');
 
     if (toggle && modal) {
       const onToggleClick = (e) => {
@@ -2441,9 +2660,10 @@ export class MotionController {
     const valGrip = root.querySelector('#val_grip, [data-joint-val="grip"]');
 
     if (sliderGrip) {
+      this._domElements['slider_grip'] = sliderGrip;
       const onGripInput = (e) => {
         const raw = parseFloat(e.target.value);
-        const isPctSlider = Number(sliderGrip.max) <= 100;
+        const isPctSlider = Number(sliderGrip.max) <= 100 && Number(sliderGrip.max) > 0;
         const angle = isPctSlider ? Math.round(raw * 1.8) : raw;
         const shouldSend = (this.executionMode === 'direct_drive' && this.isArmed);
         this.setGripperMacro(angle, shouldSend);
@@ -2453,7 +2673,7 @@ export class MotionController {
 
       const onGripChange = (e) => {
         const raw = parseFloat(e.target.value);
-        const isPctSlider = Number(sliderGrip.max) <= 100;
+        const isPctSlider = Number(sliderGrip.max) <= 100 && Number(sliderGrip.max) > 0;
         const angle = isPctSlider ? Math.round(raw * 1.8) : raw;
         const shouldSend = (this.executionMode === 'direct_drive' && this.isArmed);
         this.setGripperMacro(angle, shouldSend);
@@ -2463,9 +2683,10 @@ export class MotionController {
     }
 
     if (valGrip) {
+      this._domElements['val_grip'] = valGrip;
       const onValChange = (e) => {
         const raw = parseFloat(e.target.value);
-        const isPct = Number(sliderGrip?.max || 100) <= 100;
+        const isPct = Number(sliderGrip?.max || 100) <= 100 && Number(sliderGrip?.max || 100) > 0;
         const angle = isPct ? Math.round(raw * 1.8) : raw;
         const shouldSend = (this.executionMode === 'direct_drive' && this.isArmed);
         this.setGripperMacro(angle, shouldSend);
@@ -2518,6 +2739,103 @@ export class MotionController {
     if (badgeText && gripTelem.effort !== undefined) {
       const pct = Math.max(0, Math.min(100, Math.round((gripTelem.effort / 500) * 100)));
       badgeText.textContent = `LOAD: ${pct}%`;
+    }
+  }
+
+  /**
+   * Updates dual-marker live vs ghost position indicators and delta badges on J1-J6 tracks
+   * @private
+   */
+  _updateJointDualMarkers() {
+    if (!this._domBound) return;
+    const livePose = (this.appState && typeof this.appState.getState === 'function')
+      ? this.appState.getState('livePose')
+      : null;
+
+    for (const joint of ['j1', 'j2', 'j3', 'j4', 'j5', 'j6']) {
+      const cfg = JOINT_CONFIGS[joint];
+      if (!cfg) continue;
+      const range = (cfg.max - cfg.min) || 1;
+      const ghostAngle = Number(this.joints[joint] ?? cfg.default);
+      const liveAngle = (livePose && typeof livePose[joint] === 'number' && !Number.isNaN(livePose[joint]))
+        ? Number(livePose[joint])
+        : ghostAngle;
+
+      const ghostPct = Math.max(0, Math.min(100, ((ghostAngle - cfg.min) / range) * 100));
+      const livePct = Math.max(0, Math.min(100, ((liveAngle - cfg.min) / range) * 100));
+      const deltaDeg = ghostAngle - liveAngle;
+
+      const liveMarker = this._domElements[`live_marker_${joint}`];
+      if (liveMarker && liveMarker.style) {
+        liveMarker.style.left = `${livePct.toFixed(1)}%`;
+      }
+
+      const deltaSpan = this._domElements[`delta_span_${joint}`];
+      if (deltaSpan && deltaSpan.style) {
+        const leftPct = Math.min(ghostPct, livePct);
+        const widthPct = Math.abs(ghostPct - livePct);
+        deltaSpan.style.left = `${leftPct.toFixed(1)}%`;
+        deltaSpan.style.width = `${widthPct.toFixed(1)}%`;
+      }
+
+      const deltaBadge = this._domElements[`delta_badge_${joint}`];
+      if (deltaBadge) {
+        if (Math.abs(deltaDeg) > 0.1) {
+          const sign = deltaDeg > 0 ? '+' : '';
+          deltaBadge.textContent = `Δ${sign}${deltaDeg.toFixed(1)}°`;
+          deltaBadge.classList?.add('visible');
+        } else {
+          deltaBadge.textContent = '';
+          deltaBadge.classList?.remove('visible');
+        }
+      }
+    }
+  }
+
+  /**
+   * Updates the inline SVG parallel-jaw indicator and millimeter gap badge in the persistent gripper card
+   * @private
+   */
+  _updateGripperJawGraphic() {
+    if (!this.container && typeof document === 'undefined') return;
+    const root = (typeof document !== 'undefined' && document) ? document : this.container;
+    if (!root || typeof root.querySelector !== 'function') return;
+
+    const gripDeg = Number(this.joints.grip ?? 0);
+    const pct = Math.max(0, Math.min(100, gripDeg / 1.8));
+    const offset = (pct / 100) * 19.5; // 0 -> 19.5px outward translation from closed center
+    const leftX = (27.5 - offset).toFixed(1);
+    const rightX = (32.5 + offset).toFixed(1);
+
+    const jawLeft = root.querySelector('#gripper_jaw_left');
+    const jawRight = root.querySelector('#gripper_jaw_right');
+    const gapLabel = root.querySelector('#gripper_jaw_gap_label');
+
+    if (jawLeft && typeof jawLeft.setAttribute === 'function') {
+      jawLeft.setAttribute('transform', `translate(${leftX}, 0)`);
+    }
+    if (jawRight && typeof jawRight.setAttribute === 'function') {
+      jawRight.setAttribute('transform', `translate(${rightX}, 0)`);
+    }
+    if (gapLabel) {
+      const spanMm = (pct * 0.42).toFixed(1);
+      gapLabel.textContent = `${spanMm}mm`;
+    }
+  }
+
+  /**
+   * Notifies AppState when a J1-J6 joint card is hovered/focused for 2D<->3D link highlighting
+   * @param {'j1'|'j2'|'j3'|'j4'|'j5'|'j6'|null} joint
+   */
+  setHighlightedJoint(joint) {
+    this._highlightedJoint = joint || null;
+    if (this.appState) {
+      if (typeof this.appState.setState === 'function') {
+        this.appState.setState('ui.highlightedJoint', this._highlightedJoint);
+      }
+      if (typeof this.appState.emit === 'function') {
+        this.appState.emit('ui:highlightJoint', this._highlightedJoint);
+      }
     }
   }
 
@@ -2780,6 +3098,8 @@ export class MotionController {
    */
   dispose() {
     this.unbindDom();
+    if (this._serialDataUnsub) this._serialDataUnsub();
+    this._serialDataUnsub = null;
     for (const unsub of this._unsubState) {
       try {
         unsub();

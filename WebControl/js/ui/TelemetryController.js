@@ -604,18 +604,26 @@ export class TelemetryController {
       ctx.fillText(label, x, padding.top + plotH + 6);
     }
 
-    // Draw Series Lines
+    // Draw crisp 0-reference oscilloscope graticule line when 0 is within range
+    if (yMin < 0 && yMax > 0) {
+      const zeroNorm = (0 - yMin) / yRange;
+      const zeroY = padding.top + plotH - zeroNorm * plotH;
+      ctx.save();
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, zeroY);
+      ctx.lineTo(padding.left + plotW, zeroY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw Series Area Fills & Lines
     for (const s of seriesList) {
       if (!s.active) continue;
 
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-
-      let hasDrawn = false;
-      let lastX = 0;
-      let lastY = 0;
-
+      const coords = [];
       for (let i = 0; i < activePoints.length; i++) {
         const pt = activePoints[i];
         const val = pt[s.key];
@@ -626,25 +634,103 @@ export class TelemetryController {
 
         const x = padding.left + normX * plotW;
         const y = padding.top + plotH - normY * plotH;
-
-        if (!hasDrawn) {
-          ctx.moveTo(x, y);
-          hasDrawn = true;
-        } else {
-          ctx.lineTo(x, y);
-        }
-        lastX = x;
-        lastY = y;
+        coords.push({ x, y, val, timestamp: pt.timestamp });
       }
 
-      if (hasDrawn) {
+      if (coords.length > 0) {
+        // 1. Subtle vertical gradient area fill beneath trace
+        if (coords.length > 1 && typeof ctx.createLinearGradient === 'function' && typeof ctx.closePath === 'function') {
+          const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotH);
+          if (grad && typeof grad.addColorStop === 'function') {
+            grad.addColorStop(0, `${s.color}2e`); // ~18% opacity at top
+            grad.addColorStop(1, `${s.color}00`); // 0% opacity at baseline
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(coords[0].x, padding.top + plotH);
+            for (let i = 0; i < coords.length; i++) {
+              ctx.lineTo(coords[i].x, coords[i].y);
+            }
+            ctx.lineTo(coords[coords.length - 1].x, padding.top + plotH);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // 2. Crisp 2px oscilloscope trace line
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < coords.length; i++) {
+          if (i === 0) ctx.moveTo(coords[i].x, coords[i].y);
+          else ctx.lineTo(coords[i].x, coords[i].y);
+        }
         ctx.stroke();
 
-        // Draw live endpoint pulse dot
+        // 3. Live endpoint pulse dot
+        const lastPt = coords[coords.length - 1];
         ctx.fillStyle = s.color;
         ctx.beginPath();
-        ctx.arc(lastX, lastY, 3.5, 0, Math.PI * 2);
+        ctx.arc(lastPt.x, lastPt.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
+      }
+    }
+
+    // Interactive Oscilloscope Hover Crosshair & Sample Readout
+    if (typeof canvas._hoverX === 'number' && canvas._hoverX >= padding.left && canvas._hoverX <= padding.left + plotW) {
+      const hoverRatio = (canvas._hoverX - padding.left) / plotW;
+      const targetTs = tMin + hoverRatio * windowMs;
+      let nearestPt = activePoints[0];
+      let minDiff = Math.abs(nearestPt.timestamp - targetTs);
+      for (let i = 1; i < activePoints.length; i++) {
+        const d = Math.abs(activePoints[i].timestamp - targetTs);
+        if (d < minDiff) {
+          minDiff = d;
+          nearestPt = activePoints[i];
+        }
+      }
+
+      if (nearestPt) {
+        const cursorX = padding.left + Math.max(0, Math.min(1, (nearestPt.timestamp - tMin) / windowMs)) * plotW;
+        ctx.save();
+        if (typeof ctx.setLineDash === 'function') ctx.setLineDash([2, 2]);
+        ctx.strokeStyle = 'rgba(248, 250, 252, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cursorX, padding.top);
+        ctx.lineTo(cursorX, padding.top + plotH);
+        ctx.stroke();
+        ctx.restore();
+
+        const readoutParts = [];
+        for (const s of seriesList) {
+          if (!s.active) continue;
+          const v = nearestPt[s.key];
+          if (typeof v === 'number' && !isNaN(v)) {
+            const py = padding.top + plotH - Math.max(0, Math.min(1, (v - yMin) / yRange)) * plotH;
+            ctx.fillStyle = s.color;
+            ctx.beginPath();
+            ctx.arc(cursorX, py, 3, 0, Math.PI * 2);
+            ctx.fill();
+            readoutParts.push(`${s.key.toUpperCase()}:${v.toFixed(1)}`);
+          }
+        }
+
+        if (readoutParts.length > 0) {
+          const text = readoutParts.join('  ');
+          ctx.font = '10px monospace';
+          const textW = (typeof ctx.measureText === 'function' ? ctx.measureText(text).width : text.length * 6) + 10;
+          const boxX = Math.max(padding.left + 4, padding.left + plotW - textW - 4);
+          const boxY = padding.top + 2;
+          ctx.fillStyle = 'rgba(13, 15, 18, 0.88)';
+          ctx.fillRect(boxX, boxY, textW, 14);
+          ctx.strokeStyle = 'rgba(226, 232, 240, 0.22)';
+          ctx.lineWidth = 1;
+          if (typeof ctx.strokeRect === 'function') ctx.strokeRect(boxX, boxY, textW, 14);
+          ctx.fillStyle = '#f8fafc';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, boxX + 5, boxY + 7);
+        }
       }
     }
 
@@ -804,6 +890,26 @@ export class TelemetryController {
       this._eventCleanups.push(() => pill.removeEventListener('click', onPillClick));
     });
 
+    // Interactive Oscilloscope Crosshair Hover Listeners
+    [this.dom.canvasJoints, this.dom.canvasTcp].forEach((canvas) => {
+      if (!canvas || typeof canvas.addEventListener !== 'function') return;
+      const onMove = (e) => {
+        const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { left: 0 };
+        canvas._hoverX = e.clientX - rect.left;
+        this.renderCharts();
+      };
+      const onLeave = () => {
+        canvas._hoverX = null;
+        this.renderCharts();
+      };
+      canvas.addEventListener('mousemove', onMove);
+      canvas.addEventListener('mouseleave', onLeave);
+      this._eventCleanups.push(() => {
+        canvas.removeEventListener('mousemove', onMove);
+        canvas.removeEventListener('mouseleave', onLeave);
+      });
+    });
+
     if (this.useChartJs) {
       this._initChartJs();
     }
@@ -832,28 +938,28 @@ export class TelemetryController {
         <!-- Status HUD Grid -->
         <div class="status-hud-grid">
           <div class="hud-card">
-            <span class="hud-card-label">Safety State</span>
+            <span class="hud-card-label">Safety</span>
             <div class="status-badge badge-estop safe">ESTOP OK</div>
           </div>
 
           <div class="hud-card">
-            <span class="hud-card-label">Homing Routine</span>
-            <div class="status-badge badge-homing idle">HOMED / IDLE</div>
+            <span class="hud-card-label">Homing</span>
+            <div class="status-badge badge-homing idle">HOMED</div>
           </div>
 
           <div class="hud-card">
-            <span class="hud-card-label">Closed Loop Mode</span>
+            <span class="hud-card-label">Loop</span>
             <div class="status-badge badge-closed-loop cl-off">CL_OFF</div>
           </div>
 
           <div class="hud-card">
-            <span class="hud-card-label">Speed Override</span>
+            <span class="hud-card-label">Speed</span>
             <div class="hud-card-value speed-value">100%</div>
             <div class="speed-meter-bar"><div class="speed-meter-fill" style="width: 100%;"></div></div>
           </div>
 
           <div class="hud-card">
-            <span class="hud-card-label">Telemetry Rate</span>
+            <span class="hud-card-label">Rate</span>
             <div class="hud-card-value badge-rate">
               <span class="rate-pulse-dot offline"></span>
               <span class="rate-value">0.0 Hz</span>
@@ -861,7 +967,7 @@ export class TelemetryController {
           </div>
 
           <div class="hud-card">
-            <span class="hud-card-label">Collision Flag</span>
+            <span class="hud-card-label">Fault</span>
             <div class="status-badge badge-collision no-collision">OK: EC000</div>
             <div class="collision-axis-dots">
               <span class="collision-axis-pill col-pill-j1">J1</span>
@@ -876,11 +982,11 @@ export class TelemetryController {
           <!-- Joint Angles Chart Card -->
           <div class="chart-card">
             <div class="chart-card-header">
-              <span class="chart-card-title">Joint Angles (J1, J2, J3)</span>
+              <span class="chart-card-title">Joint Angles (°)</span>
               <div class="chart-channel-pills">
-                <span class="channel-pill j1 active" data-chart="joints" data-channel="j1">J1 (Base)</span>
-                <span class="channel-pill j2 active" data-chart="joints" data-channel="j2">J2 (Shoulder)</span>
-                <span class="channel-pill j3 active" data-chart="joints" data-channel="j3">J3 (Elbow)</span>
+                <span class="channel-pill j1 active" data-chart="joints" data-channel="j1" title="J1 (Base)">J1</span>
+                <span class="channel-pill j2 active" data-chart="joints" data-channel="j2" title="J2 (Shoulder)">J2</span>
+                <span class="channel-pill j3 active" data-chart="joints" data-channel="j3" title="J3 (Elbow)">J3</span>
               </div>
             </div>
             <div class="chart-canvas-wrapper">
@@ -891,11 +997,11 @@ export class TelemetryController {
           <!-- TCP Coordinates Chart Card -->
           <div class="chart-card">
             <div class="chart-card-header">
-              <span class="chart-card-title">TCP Coordinates (X, Y, Z)</span>
+              <span class="chart-card-title">TCP Position (mm)</span>
               <div class="chart-channel-pills">
-                <span class="channel-pill x active" data-chart="tcp" data-channel="x">X (mm)</span>
-                <span class="channel-pill y active" data-chart="tcp" data-channel="y">Y (mm)</span>
-                <span class="channel-pill z active" data-chart="tcp" data-channel="z">Z (mm)</span>
+                <span class="channel-pill x active" data-chart="tcp" data-channel="x" title="X Axis (mm)">X</span>
+                <span class="channel-pill y active" data-chart="tcp" data-channel="y" title="Y Axis (mm)">Y</span>
+                <span class="channel-pill z active" data-chart="tcp" data-channel="z" title="Z Axis (mm)">Z</span>
               </div>
             </div>
             <div class="chart-canvas-wrapper">
